@@ -126,6 +126,7 @@ const isChatMain = computed(() => {
     <CursorItem v-for="cursor in cursors" ref="items" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" />
     <div class="flex h-5 m-2 mb-0">
       <p class="font-sans"><b>Session ID: </b>{{sessionId}}</p>
+      <!-- copy.svg is licensed with https://opensource.org/license/mit -->
       <img src="../assets/copy.svg" class="flex-initial hover:opacity-50" @click="navigator.clipboard.writeText(sessionId)" alt="Copy session id to clipboard">
     </div>
     <hr class="my-3" />
