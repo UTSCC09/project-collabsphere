@@ -48,15 +48,15 @@ function connection_init(conn) {
       if (!(conn.peer in itemRefs)) {
         cursors.value.push({
           id: conn.peer,
-          username: otherUsers.get(conn.peer),
+          username: otherUsers.get(conn.peer).username,
           x_coord: x_coord,
           y_coord: y_coord
         });
       }
     });
     conn.on("close", () => {
-      // TODO security risk: a user can emit another user's id to get disconnect them
-      socket.emit("leave_session", sessionId, id);
+      // TODO might be able to disconnect others by emitting their id
+      socket.emit("leave_session", sessionId, peer.id);
     });
     conn.on("error", (error) => {
       console.log(error);
@@ -83,9 +83,24 @@ onMounted(() => {
   // when a user connects to this session, create a new connection
   // and initialize it.
   socket.on("user_connection", (id, username) => {
-    otherUsers.set(id, username);
     const conn = peer.connect(id);
+    otherUsers.set(id, {username: username, connection: conn});
     connection_init(conn);
+  });
+
+  // when a user leaves this session, remove their cursor
+  socket.on("user_disconnection", (id) => {
+    const index = conns.indexOf(otherUsers.get(id).connection);
+    if (index !== -1) {
+      conns.splice(index, 1);
+      otherUsers.delete(id);
+
+      for (let i = 0; i < cursors.value.length; i++) {
+        if (cursors[i].id === id) {
+          cursors.value.splice(i, 1);
+        }
+      }
+    }
   });
 
   // when mouse is moved, broadcast mouse position to all connections

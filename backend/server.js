@@ -11,6 +11,14 @@ const app = express();
 
 app.use(express.json());
 
+const { Server } = require("socket.io");
+
+const io = new Server({
+  cors: {
+    origin: '*'
+  }
+});
+
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
@@ -46,6 +54,18 @@ if (process.env.NODE_ENV !== 'test') {
   });
   app.use('/peerjs', peerServer);
 }
+
+io.on("connection", (socket) => {
+  socket.on("join_session", (sessionId, id, username) => {
+    socket.join(sessionId);
+    socket.to(sessionId).emit("user_connection", id, username);
+  });
+
+  socket.on("leave_session", (sessionId, id) => {
+    socket.to(sessionId).emit("user_disconnection", id);
+    socket.leave(sessionId);
+  });
+});
 
 // export the app for testing
 export default app;
