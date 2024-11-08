@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
 import sessionRoutes from './routes/sessionRoutes.js';
-import { ExpressPeerServer } from 'peer';
+import {ExpressPeerServer} from 'peer';
 import http from 'http';
 import { Server } from 'socket.io';
 
@@ -21,6 +21,20 @@ const io = new Server(server, {
     credentials: true,
   }
 });
+
+const customGenerationFunction = () =>
+  (Math.random().toString(36) + "0000000000000000000").substring(2, 16);
+
+const pServer = app.listen(443);
+
+const peerServer = ExpressPeerServer(pServer, {
+  debug: true,
+  proxied: true,
+  path: '/app',
+  generateClientId: customGenerationFunction,
+});
+
+app.use(peerServer);
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -57,12 +71,6 @@ if (process.env.NODE_ENV !== 'test') {
   const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
-
-  const peerServer = ExpressPeerServer(server, {
-    debug: true,
-    path: '/peerjs'
-  });
-  app.use('/peerjs', peerServer);
 }
 
 io.on("connection", (socket) => {

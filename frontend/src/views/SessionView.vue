@@ -8,7 +8,7 @@ import DocumentReader from "@/components/DocumentReader.vue";
 
 // true if user is host
 let isHost = true; //false;
-const sessionId = "1000a";
+const sessionId = "1000b";
 const username = Math.random().toString(36).substring(7);
 
 // determines which view is currently in the main slot
@@ -16,7 +16,13 @@ let view = ref(0);
 let mounted = ref(false);
 
 // TODO enable secure: true
-const peer = new Peer();
+const peer = new Peer({
+  host: "/",
+  port: 443,
+  path: "app",
+  proxied: true,
+});
+
 // list of all connections
 const conns = [];
 // list of all peers
@@ -36,36 +42,33 @@ const socket = io("ws://localhost:3030", {
 
 // modified from https://stackoverflow.com/questions/30738079/webrtc-peerjs-text-chat-connect-to-multiple-peerid-at-the-same-time
 function connection_init(conn) {
+  conns.push(conn);
+
   // each x_coord and y_coord is unique b/c of closure
   const x_coord = ref(0);
   const y_coord = ref(0);
 
-  console.log(conn.open);
+  console.log("Connection established.");
+  conn.on("data", (data) => {
+    // TODO use interpolation
+    x_coord.value = data.x;
+    y_coord.value = data.y;
 
-  conns.push(conn);
+    // if no cursor for this connection exists yet, create one
+    if (!(conn.peer in itemRefs)) {
+      // TODO find a way to make it so that username is not sent every time
+      // TODO problem is those who connect to new user don't share username
+      cursors.value.push({
+        id: conn.peer,
+        username: data.username,
+        x_coord: x_coord,
+        y_coord: y_coord
+      });
+    }
+  });
 
-  // TODO why does this not work?
-  conn.on("open", () => {
-    conn.on("data", (data) => {
-      console.log(data);
-      // TODO use interpolation
-      x_coord.value = data.x;
-      y_coord.value = data.y;
-
-      // if no cursor for this connection exists yet, create one
-      if (!(conn.peer in itemRefs)) {
-        cursors.value.push({
-          id: conn.peer,
-          username: otherUsers.get(conn.peer).username,
-          x_coord: x_coord,
-          y_coord: y_coord
-        });
-      }
-    });
-
-    conn.on("error", (error) => {
-      console.log(error);
-    });
+  conn.on("error", (error) => {
+    console.log(error);
   });
 }
 
@@ -77,7 +80,10 @@ function peer_init() {
 
   // when a user connects with you, initialize the connection
   peer.on("connection", (conn) => {
-    connection_init(conn);
+    conn.on("open", () => {
+      otherUsers.set(conn.peer, conn);
+      connection_init(conn);
+    });
   });
 
   peer.on("close", () => {
@@ -86,19 +92,23 @@ function peer_init() {
 }
 
 onMounted(() => {
+  mounted.value = true;
   peer_init();
 
   // when a user connects to this session, create a new connection
   // and initialize it.
   socket.on("user_connection", (id, username) => {
+    console.log("Another user connected to the session.");
     const conn = peer.connect(id);
-    connection_init(conn);
-    otherUsers.set(id, {username: username, connection: conn});
+    conn.on("open", () => {
+      otherUsers.set(id, conn);
+      connection_init(conn);
+    });
   });
 
   // when a user leaves this session, remove their cursor
   socket.on("user_disconnection", (id) => {
-    const index = conns.indexOf(otherUsers.get(id).connection);
+    const index = conns.indexOf(otherUsers.get(id));
     if (index !== -1) {
       conns.splice(index, 1);
       otherUsers.delete(id);
@@ -114,11 +124,10 @@ onMounted(() => {
   // when mouse is moved, broadcast mouse position to all connections
   // event is throttled to reduce load on connection
   onmousemove = (e) => {
-    // throttle(100, () => {
-      for (let conn of conns) {
-        conn.send({x: e.clientX, y: e.clientY});
-      }
-    // });
+    // TODO implement throttle
+    for (let conn of conns) {
+      conn.send({username: username, x: e.clientX, y: e.clientY});
+    }
   }
 });
 
