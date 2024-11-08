@@ -98,9 +98,9 @@ async function signup() {
     }
     const json = await response.json()
 
-    const { username, email: resEmail } = json
+    const { username: resUsername, email: resEmail } = json
 
-    userstore.setUsername(username)
+    userstore.setUsername(resUsername)
     userstore.setEmail(resEmail)
     userstore.login()
   } catch (error) {

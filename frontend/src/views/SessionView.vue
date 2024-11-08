@@ -6,9 +6,18 @@ import { io } from "socket.io-client";
 import CursorItem from "@/components/CursorItem.vue";
 import DocumentReader from "@/components/DocumentReader.vue";
 
+import { useUserdataStore } from "@/stores/userdata";
+
+
 // true if user is host
-let isHost = true; //false;
-const sessionId = "1000b";
+const isHost = computed(() => {
+  return useUserdataStore().isHost;
+});
+
+const sessionID = computed(() => {
+  return useUserdataStore().sessionID;
+});
+
 const username = Math.random().toString(36).substring(7);
 
 // determines which view is currently in the main slot
@@ -34,8 +43,7 @@ const itemRefs = useTemplateRef("items");
 // null while no file has been uploaded
 const file = ref(null);
 
-// TODO change url below to backend
-const socket = io("ws://localhost:3030", {
+const socket = io(`ws://${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID}`, {
   transports: ['websocket', 'polling', 'flashsocket'],
   withCredentials: true,
 });

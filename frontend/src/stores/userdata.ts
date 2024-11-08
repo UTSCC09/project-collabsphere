@@ -35,25 +35,33 @@ export const useUserdataStore = defineStore('userdata', () => {
     saveToLocalStorage()
   }
 
-  const hostSession = (sessionID) => {
+  const hostSession = (sessionId) => {
     isHost.value = true
-    sessionID.value = sessionID
+    sessionID.value = sessionId
+    saveToLocalStorage()
+    
   }
 
-  const joinSession = (sessionID) => {
+  const joinSession = (sessionId) => {
     isHost.value = false
-    sessionID.value = sessionID
+    sessionID.value = sessionId
+    saveToLocalStorage()
+
   }
 
   const leaveSession = () => {
     isHost.value = false
     sessionID.value = ''
+    saveToLocalStorage()
+
   }
 
   const saveToLocalStorage = () => {
     const content = {
       username: username.value,
       email: useremail.value,
+      sessionID: sessionID.value,
+      isHost: isHost.value,
     }
 
     localStorage.setItem('userdata', JSON.stringify(content))
@@ -66,6 +74,8 @@ export const useUserdataStore = defineStore('userdata', () => {
       const data = JSON.parse(content)
       username.value = data.username
       useremail.value = data.email
+      sessionID.value = data.sessionID
+      isHost.value = data.isHost
       if (username.value) {
         isLoggedIn.value = true
       }
@@ -89,5 +99,7 @@ export const useUserdataStore = defineStore('userdata', () => {
     hostSession,
     joinSession,
     leaveSession,
+    sessionID,
+    isHost,
   }
 })

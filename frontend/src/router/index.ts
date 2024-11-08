@@ -11,8 +11,8 @@ const router = createRouter({
       component: HomeView,
     },
     {
-      path: "/test-session",
-      name: "test-session",
+      path: "/session",
+      name: "session",
       component: SessionView,
     }
   ],
