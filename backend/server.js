@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
 import sessionRoutes from './routes/sessionRoutes.js';
 import { ExpressPeerServer } from 'peer';
+import http from 'http';
+import { Server } from 'socket.io';
 
 dotenv.config();
 
@@ -11,9 +13,9 @@ const app = express();
 
 app.use(express.json());
 
-const { Server } = require("socket.io");
+const server = http.createServer(app);
 
-const io = new Server({
+const io = new Server(server, {
   cors: {
     origin: '*'
   }
@@ -59,13 +61,14 @@ io.on("connection", (socket) => {
   socket.on("join_session", (sessionId, id, username) => {
     socket.join(sessionId);
     socket.to(sessionId).emit("user_connection", id, username);
-  });
 
-  socket.on("leave_session", (sessionId, id) => {
-    socket.to(sessionId).emit("user_disconnection", id);
-    socket.leave(sessionId);
+    socket.on("leave_session", () => {
+      socket.to(sessionId).emit("user_disconnection", id);
+      socket.leave(sessionId);
+    });
   });
 });
 
+server.listen(3030);
 // export the app for testing
 export default app;

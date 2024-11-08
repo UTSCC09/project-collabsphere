@@ -55,8 +55,7 @@ function connection_init(conn) {
       }
     });
     conn.on("close", () => {
-      // TODO might be able to disconnect others by emitting their id
-      socket.emit("leave_session", sessionId, peer.id);
+      socket.emit("leave_session");
     });
     conn.on("error", (error) => {
       console.log(error);
