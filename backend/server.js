@@ -82,6 +82,10 @@ io.on("connection", (socket) => {
       socket.to(sessionId).emit("user_disconnection", id);
       socket.leave(sessionId);
     });
+
+    socket.on("send_file", (file) => {
+      socket.to(sessionId).emit("send_file", file);
+    });
   });
 });
 

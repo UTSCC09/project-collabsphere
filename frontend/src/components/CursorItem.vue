@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import {computed, ref} from "vue";
-import { PerfectCursor } from "perfect-cursors";
+import {computed} from "vue";
 
 const props = defineProps({
   x_coord: Number,
@@ -41,7 +40,6 @@ const color = props.username.toColor();
 
 // converts x_coord to pixel value
 const x = computed(() => {
-  console.log(props.x_coord);
   return props.x_coord * window.innerWidth;
 });
 

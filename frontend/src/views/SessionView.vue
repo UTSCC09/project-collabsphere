@@ -48,6 +48,11 @@ function connection_init(conn) {
 
   console.log("Connection established.");
   conn.on("data", (data) => {
+    if (data.file) {
+      file.value = new Blob([data.file]);
+      return;
+    }
+
     // TODO use interpolation
     x_coord.value = data.x;
     y_coord.value = data.y;
@@ -101,6 +106,13 @@ onMounted(() => {
     conn.on("open", () => {
       otherUsers.set(id, conn);
       connection_init(conn);
+      if (file.value && isHost) {
+        const fileReader = new FileReader();
+        fileReader.onload = async () => {
+          conn.send({file: fileReader.result});
+        }
+        fileReader.readAsArrayBuffer(file.value);
+      }
     });
   });
 
@@ -121,7 +133,7 @@ onMounted(() => {
 
   // when mouse is moved, broadcast mouse position to all connections
   function sendCursor(e, conns, username) {
-    for (let conn of conns) {
+    for (const conn of conns) {
       conn.send({ username: username, x: e.clientX / e.view.window.innerWidth, y: e.clientY / e.view.window.innerHeight });
     }
   }
@@ -136,11 +148,16 @@ onMounted(() => {
   onmousemove = e => throttledSendCursor(e, conns, username)
 });
 
-
 function handleFileInput(e) {
-  console.log(e.target.files[0]);
   file.value = e.target.files[0];
+
+  socket.emit("send_file", e.target.files[0]);
 }
+
+socket.on("send_file", (new_file) => {
+  if (!file.value)
+    file.value = new Blob([new_file]);
+});
 
 const isFile = computed(() => {
   return file.value !== null;
