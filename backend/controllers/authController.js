@@ -1,8 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-// import nodemailer from 'nodemailer';
-// import nodemailerMock from 'nodemailer-mock';
+import transporter from '../services/emailService.js';
 
 const usernameRegex = /^[ A-Za-z0-9_@./#&+!-]{8,20}$/;
 
@@ -67,55 +66,59 @@ export const signout = (req, res) => {
   res.json({ message: 'Signout successful' });
 };
 
-// request password reset
+// Request password reset
 export const requestPasswordReset = async (req, res) => {
-//   const { email } = req.query;
+  const { email } = req.query;
 
-//   try {
-//     const user = await User.findOne({ email });
-//     if (!user) {
-//       return res.status(404).json({ message: 'User not found' });
-//     }
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
-//     const resetCode = Math.floor(100000 + Math.random() * 900000).toString(); 
-//     user.resetCode = resetCode;
-//     await user.save();
+    // Generate a reset code
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetCode = resetCode;
+    await user.save();
 
-//     const mailOptions = {
-//       from: process.env.EMAIL_USER,
-//       to: email,
-//       subject: 'Password Reset Code',
-//       text: `Your password reset code is: ${resetCode}`,
-//     };
+    // Send reset code via email
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Password Reset Code',
+      text: `Your password reset code is: ${resetCode}`,
+    };
 
-//     await transporter.sendMail(mailOptions);
-//     res.json({ message: 'Reset code sent to email' });
-//   } catch (error) {
-//     console.error('Password Reset Request Error:', error);
-//     res.status(500).json({ message: 'Failed to send reset code', error });
-//   }
+    await transporter.sendMail(mailOptions);
+    res.json({ message: 'Reset code sent to email' });
+  } catch (error) {
+    console.error('Password Reset Request Error:', error);
+    res.status(500).json({ message: 'Failed to send reset code', error });
+  }
 };
 
-// reset password
+// Reset password
 export const resetPassword = async (req, res) => {
-//   const { email } = req.query;
-//   const { password, code } = req.body;
+  const { email } = req.query;
+  const { password, code } = req.body;
 
-//   try {
-//     const user = await User.findOne({ email, resetCode: code });
-//     if (!user) {
-//       return res.status(400).json({ message: 'Invalid reset code or user not found' });
-//     }
+  try {
+    const user = await User.findOne({ email, resetCode: code });
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid reset code or user not found' });
+    }
 
-//     const salt = await bcrypt.genSalt(10);
-//     user.hash = await bcrypt.hash(password, salt);
-//     user.salt = salt;
-//     user.resetCode = null; 
-//     await user.save();
+    // Hash the new password
+    const salt = await bcrypt.genSalt(10);
+    user.hash = await bcrypt.hash(password, salt);
+    user.salt = salt;
+    user.resetCode = null; // Clear the reset code after successful password reset
+    await user.save();
 
-//     res.json({ message: 'Password reset successful' });
-//   } catch (error) {
-//     console.error('Password Reset Error:', error);
-//     res.status(500).json({ message: 'Failed to reset password', error });
-//   }
+    res.json({ message: 'Password reset successful' });
+  } catch (error) {
+    console.error('Password Reset Error:', error);
+    res.status(500).json({ message: 'Failed to reset password', error });
+  }
 };
+
