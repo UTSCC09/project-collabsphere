@@ -124,11 +124,11 @@ onMounted(() => {
   // when mouse is moved, broadcast mouse position to all connections
   function sendCursor(e, conns, username) {
     for (let conn of conns) {
-      conn.send({ username: username, x: e.clientX, y: e.clientY })
+      conn.send({ username: username, x: e.clientX / e.view.window.innerWidth, y: e.clientY / e.view.window.innerHeight });
     }
   }
 
-  const throttledSendCursor = throttle(50, sendCursor, {
+  const throttledSendCursor = throttle(100, sendCursor, {
     noLeading: false,
     noTrailing: false,
   })
