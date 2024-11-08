@@ -44,12 +44,13 @@ async function getPdf() {
 onMounted(() => {
   getPdf();
 });
-
-// watch(() => props.file.value, readDocument, { immediate: true })
 </script>
 
 <template>
   <div id="pageContainer" class="pdfViewer singlePageView"></div>
+  <!--
+  <iframe src="https://mozilla.github.io/pdf.js/web/viewer.html?file=compressed.tracemonkey-pldi-09.pdf" width="100%" height="100%" frameborder="0" />
+  -->
 </template>
 
 <style>
