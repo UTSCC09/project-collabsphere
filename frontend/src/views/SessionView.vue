@@ -122,14 +122,22 @@ onMounted(() => {
   });
 
   // when mouse is moved, broadcast mouse position to all connections
-  // event is throttled to reduce load on connection
-  onmousemove = (e) => {
-    // TODO implement throttle
+  function sendCursor(e, conns, username) {
     for (let conn of conns) {
-      conn.send({username: username, x: e.clientX, y: e.clientY});
+      conn.send({ username: username, x: e.clientX, y: e.clientY })
     }
   }
+
+  const throttledSendCursor = throttle(50, sendCursor, {
+    noLeading: false,
+    noTrailing: false,
+  })
+
+  // when mouse is moved, broadcast mouse position to all connections
+  // event is throttled to reduce load on connection
+  onmousemove = e => throttledSendCursor(e, conns, username)
 });
+
 
 function handleFileInput(e) {
   console.log(e.target.files[0]);
