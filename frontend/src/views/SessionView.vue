@@ -11,9 +11,7 @@ let isHost = true; //false;
 const sessionId = "1000b";
 const username = Math.random().toString(36).substring(7);
 
-// determines which view is currently in the main slot
-let view = ref(0);
-let mounted = ref(false);
+const mounted = ref(false);
 
 // TODO enable secure: true
 const peer = new Peer({
@@ -142,21 +140,10 @@ onMounted(() => {
 function handleFileInput(e) {
   console.log(e.target.files[0]);
   file.value = e.target.files[0];
-
-  // switch DocumentReader to main
-  view.value = 1;
 }
 
-const isTextMain = computed(() => {
-  return view.value === 0;
-});
-
-const isDocumentMain = computed(() => {
-  return view.value === 1;
-});
-
-const isChatMain = computed(() => {
-  return view.value === 2;
+const isFile = computed(() => {
+  return file.value !== null;
 });
 
 </script>
@@ -167,52 +154,39 @@ const isChatMain = computed(() => {
     <div class="flex h-5 m-2 mb-0">
       <p class="font-sans"><b>Session ID: </b>{{sessionId}}</p>
       <!-- copy.svg is licensed with https://opensource.org/license/mit -->
-      <img src="../assets/copy.svg" class="flex-initial hover:opacity-50" @click="navigator.clipboard.writeText(sessionId)" alt="Copy session id to clipboard">
+      <img src="../assets/copy.svg" class="flex-initial hover:opacity-50 ml-1" @click="navigator.clipboard.writeText(sessionId)" alt="Copy session id to clipboard">
     </div>
     <hr class="my-3" />
     <div class="flex flex-row m-5">
       <div id="main-item" class="basis-2/3">
         <div v-if="mounted">
-          <Teleport :disabled="isTextMain" to="#top-side-item">
-            <p @click="view = 0">MAIN</p>
+          <Teleport :disabled="!isFile" to="#top-side-item">
+            <p>MAIN</p>
           </Teleport>
+        </div>
+        <div v-if="isFile" id="viewer">
+          <DocumentReader :file="file" />
         </div>
       </div>
       <div id="side-items" class="basis-1/3 ml-5">
         <div id="top-side-item">
-          <div v-if="mounted">
-            <Teleport :disabled="!isDocumentMain" to="#main-item">
-              <div id="pdf-viewer">
-                <label id="pdf-input" v-if="isHost && !file" class="file_upload btn">
-                  <input type="file" @input="handleFileInput" name="upload" accept="application/pdf" class="hidden" />
-                  Upload PDF
-                </label>
-                <div v-else-if="file">
-                  <p v-if="!isDocumentMain" @click="view = 1" id="expand">⛶</p>
-                  <DocumentReader :file="file" />
-                </div>
-              </div>
-            </Teleport>
-          </div>
+          <label id="pdf-input" v-if="isHost && !isFile" class="file_upload btn">
+            <input type="file" @input="handleFileInput" name="upload" accept="application/pdf" class="hidden" />
+            Upload PDF
+          </label>
         </div>
         <div id="bottom-side-item">
-          <div v-if="mounted">
-            <Teleport :disabled="!isChatMain" to="#main-item">
-              <p @click="view = 2">TEST</p>
-            </Teleport>
-          </div>
+          <p>TEST</p>
         </div>
       </div>
     </div>
   </div>
 </template>
 <style scoped>
-#expand {
-  background-color: #43ac8a;
-  color: floralwhite;
-  display: inline-block;
-  -moz-border-radius-bottomright: 3px;
-  border-bottom-right-radius: 3px;
-  position: absolute;
+#viewer {
+  border: 1px solid #ccc !important;
+  width: 100%;
+  height: calc(100vh - 80px);
+  overflow-y: scroll;
 }
 </style>

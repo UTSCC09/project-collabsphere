@@ -1,66 +1,59 @@
 <!-- This is a temporary vue item to test Document reading and segmenting -->
 <!-- Accept file as prop -->
 <script setup lang="ts" type="module">
-import { ref, watch } from 'vue'
-import { PDFDocument } from 'pdf-lib'
+import {onMounted} from 'vue';
+import * as pdfjsLib from "pdfjs-dist/build/pdf";
+import * as pdfjsViewer from "pdfjs-dist/web/pdf_viewer.mjs"
 
 const props = defineProps({
   file: Object
-})
+});
 
-const currentPage = ref(null)
-const pageMetadata = ref(null)
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.mjs"
 
-async function readDocument() {
-  if (!props.file) {
-    return console.error('No file provided')
-  }
+const PAGE_TO_VIEW = 1;
+const SCALE = 1.0;
 
+const eventBus = new pdfjsViewer.EventBus();
 
-  const pdfDoc = await PDFDocument.load(await props.file.arrayBuffer())
-  const pages = pdfDoc.getPages()
+async function getPdf() {
+  const fileReader = new FileReader();
 
-  console.log("There are " + pages.length + " pages in the document")
+  fileReader.onload = async () => {
+    const container = document.getElementById("pageContainer");
 
-  // Print all available metadata fields
-  console.log('Title:', pdfDoc.getTitle())
-  console.log('Author:', pdfDoc.getAuthor())
-  console.log('Subject:', pdfDoc.getSubject())
-  console.log('Creator:', pdfDoc.getCreator())
-  console.log('Keywords:', pdfDoc.getKeywords())
-  console.log('Producer:', pdfDoc.getProducer())
-  console.log('Creation Date:', pdfDoc.getCreationDate())
-  console.log('Modification Date:', pdfDoc.getModificationDate())
+    const loadingTask = pdfjsLib.getDocument(new Uint8Array(fileReader.result));
 
-  // Set pageMetadata ref
-  pageMetadata.value = {
-    title: pdfDoc.getTitle(),
-    author: pdfDoc.getAuthor(),
-    subject: pdfDoc.getSubject(),
-    creator: pdfDoc.getCreator(),
-    keywords: pdfDoc.getKeywords(),
-    producer: pdfDoc.getProducer(),
-    creationDate: pdfDoc.getCreationDate(),
-    modificationDate: pdfDoc.getModificationDate()
-  }
+    const pdf = await loadingTask.promise;
+    const pdfPage = await pdf.getPage(PAGE_TO_VIEW);
+    const pdfPageView = new pdfjsViewer.PDFPageView({
+      container,
+      id: PAGE_TO_VIEW,
+      scale: SCALE,
+      defaultViewport: pdfPage.getViewport({ scale: SCALE }),
+      eventBus,
+    });
 
-  // Create a pdf with only the first page
-  const newPdf = await PDFDocument.create()
-  const [firstPage] = await newPdf.copyPages(pdfDoc, [0])
-  newPdf.addPage(firstPage)
+    pdfPageView.setPdfPage(pdfPage);
+    pdfPageView.draw();
+  };
 
-  const pdfBytes = await newPdf.save()
-  const pdfUrl = URL.createObjectURL(new Blob([pdfBytes], { type: 'application/pdf' }))
-  currentPage.value = pdfUrl
-
+  fileReader.readAsArrayBuffer(props.file);
 }
 
-watch(() => props.file.value, readDocument, { immediate: true })
-
+onMounted(() => {
+  getPdf();
+});
 </script>
 
 <template>
-  <div>
-    <iframe v-if="currentPage" :src="currentPage" width="100%" height="500px"></iframe>
-  </div>
+  <div id="pageContainer" class="pdfViewer singlePageView"></div>
+  <!--
+  <iframe src="https://mozilla.github.io/pdf.js/web/viewer.html?file=compressed.tracemonkey-pldi-09.pdf" width="100%" height="100%" frameborder="0" />
+  -->
 </template>
+
+<style>
+@import "pdfjs-dist/web/pdf_viewer.css";
+
+</style>
