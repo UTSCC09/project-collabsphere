@@ -4,16 +4,34 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
 import sessionRoutes from './routes/sessionRoutes.js';
 import {ExpressPeerServer} from 'peer';
-import http from 'http';
 import { Server } from 'socket.io';
-
+import cors from 'cors';
+import { readFileSync } from "fs";
+import { createServer } from "https";
+import cookieParser from 'cookie-parser';
 dotenv.config();
 
 const app = express();
 
+app.use(cors({
+  origin: process.env.FRONTEND,
+  credentials: true,
+}));
+
 app.use(express.json());
 
-const server = http.createServer(app);
+app.use(cookieParser())
+
+
+const privateKey = readFileSync( 'server.key' );
+const certificate = readFileSync( 'server.crt' );
+const config = {
+        key: privateKey,
+        cert: certificate
+};
+
+// const server = http.createServer(app);
+const server = createServer(config, app);
 
 const io = new Server(server, {
   cors: {
@@ -68,7 +86,7 @@ app.use((err, req, res, next) => {
 // only start the server if not running tests
 if (process.env.NODE_ENV !== 'test') {
   const PORT = process.env.PORT || 4000;
-  const server = app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
@@ -85,6 +103,6 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(3030);
+// server.listen(3030);
 // export the app for testing
 export default app;

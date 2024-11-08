@@ -46,6 +46,7 @@ async function signin() {
       `${import.meta.env.VITE_PUBLIC_BACKEND}/api/signin`,
       {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
