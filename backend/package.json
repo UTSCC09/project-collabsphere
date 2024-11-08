@@ -4,7 +4,9 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "mocha test/*.test.js --timeout 5000"
+    "start": "node server.js",
+    "test:auth": "NODE_ENV=test npx mocha test/auth.test.js",
+    "test:session": "NODE_ENV=test npx mocha test/session.test.js"
   },
   "keywords": [],
   "author": "",
