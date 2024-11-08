@@ -7,7 +7,7 @@ import * as pdfjsViewer from "pdfjs-dist/web/pdf_viewer.mjs"
 
 const props = defineProps({
   file: Object
-})
+});
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.mjs"
 
