@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import {computed, ref} from "vue";
+import { PerfectCursor } from "perfect-cursors";
+
 const props = defineProps({
   x_coord: Number,
   y_coord: Number,
   username: String
 });
-
 
 // from https://gist.github.com/0x263b/2bdd90886c2036a1ad5bcf06d6e6fb37
 String.prototype.toColor = function() {
@@ -21,8 +23,33 @@ String.prototype.toColor = function() {
   return colors[hash];
 }
 
+/*
+function updateMyCursor(point: number[]) {
+  elm.style.setProperty("transform", `translate2d(${point[0]}px, ${point[1]}px)`)
+}
+
+const pc = new PerfectCursor(updateMyCursor);
+
+watch(() => [props.x_coord.value, props.y_coord.value], () => {
+  pc.addPoint([props.x_coord, props.y_coord]);
+  pc.dispose();
+});
+ */
+
 // calculate hex string using username
 const color = props.username.toColor();
+
+// converts x_coord to pixel value
+const x = computed(() => {
+  console.log(props.x_coord);
+  return props.x_coord * window.innerWidth;
+});
+
+// converts y_coord to pixel value
+const y = computed(() => {
+  return props.y_coord * window.innerHeight;
+});
+
 </script>
 
 <template>
@@ -35,7 +62,7 @@ const color = props.username.toColor();
           target="_blank"
           >CC 3.0 BY</a
         > -->
-  <div class="cursor-item absolute pointer-events-none">
+  <div :id="props.username" class="cursor-item absolute pointer-events-none">
     <svg class="cursor h-8 w-8" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
       <path
         stroke-width="0"
@@ -53,8 +80,8 @@ const color = props.username.toColor();
 }
 
 .cursor-item {
-  left: v-bind(props.x_coord + "px");
-  top: v-bind(props.y_coord + "px");
+  left: v-bind(x + "px");
+  top: v-bind(y + "px");
 }
 
 .username {

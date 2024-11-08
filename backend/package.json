@@ -27,7 +27,8 @@
     "peer": "^1.0.2",
     "peerjs": "^1.5.4",
     "pg": "^8.13.1",
-    "sequelize": "^6.37.5"
+    "sequelize": "^6.37.5",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "nodemailer-mock": "^2.0.6",

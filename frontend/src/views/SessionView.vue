@@ -8,14 +8,21 @@ import DocumentReader from "@/components/DocumentReader.vue";
 
 // true if user is host
 let isHost = true; //false;
-const sessionId = "";
-const username = "";
+const sessionId = "1000b";
+const username = Math.random().toString(36).substring(7);
 
 // determines which view is currently in the main slot
 let view = ref(0);
 let mounted = ref(false);
 
-const peer = new Peer();
+// TODO enable secure: true
+const peer = new Peer({
+  host: "/",
+  port: 443,
+  path: "app",
+  proxied: true,
+});
+
 // list of all connections
 const conns = [];
 // list of all peers
@@ -28,51 +35,59 @@ const itemRefs = useTemplateRef("items");
 const file = ref(null);
 
 // TODO change url below to backend
-const socket = io("wss://localhost:5173/session", {
+const socket = io("ws://localhost:3030", {
+  transports: ['websocket', 'polling', 'flashsocket'],
   withCredentials: true,
 });
 
 // modified from https://stackoverflow.com/questions/30738079/webrtc-peerjs-text-chat-connect-to-multiple-peerid-at-the-same-time
 function connection_init(conn) {
-  conn.on("open", () => {
-    // each x_coord and y_coord is unique b/c of closure
-    const x_coord = ref(0);
-    const y_coord = ref(0);
+  conns.push(conn);
 
-    conn.on("data", (data) => {
-      // TODO use interpolation
-      x_coord.value = data.x;
-      y_coord.value = data.y;
+  // each x_coord and y_coord is unique b/c of closure
+  const x_coord = ref(0);
+  const y_coord = ref(0);
 
-      // if no cursor for this connection exists yet, create one
-      if (!(conn.peer in itemRefs)) {
-        cursors.value.push({
-          id: conn.peer,
-          username: otherUsers.get(conn.peer),
-          x_coord: x_coord,
-          y_coord: y_coord
-        });
-      }
-    });
-    conn.on("close", () => {
-      // TODO security risk: a user can emit another user's id to get disconnect them
-      socket.emit("leave_session", sessionId, id);
-    });
-    conn.on("error", (error) => {
-      console.log(error);
-    });
-    conns.push(conn);
+  console.log("Connection established.");
+  conn.on("data", (data) => {
+    // TODO use interpolation
+    x_coord.value = data.x;
+    y_coord.value = data.y;
+
+    // if no cursor for this connection exists yet, create one
+    if (!(conn.peer in itemRefs)) {
+      // TODO find a way to make it so that username is not sent every time
+      // TODO problem is those who connect to new user don't share username
+      cursors.value.push({
+        id: conn.peer,
+        username: data.username,
+        x_coord: x_coord,
+        y_coord: y_coord
+      });
+    }
+  });
+
+  conn.on("error", (error) => {
+    console.log(error);
   });
 }
 
 function peer_init() {
-  // when a user connects with you, initialize the connection
-  peer.on("connection", (conn) => {
-    connection_init(conn);
+  peer.on("open", (id) => {
+    console.log("Joining session.")
+    socket.emit("join_session", sessionId, id, username);
   });
 
-  peer.on("open", (id) => {
-    socket.emit("join_session", sessionId, id, username);
+  // when a user connects with you, initialize the connection
+  peer.on("connection", (conn) => {
+    conn.on("open", () => {
+      otherUsers.set(conn.peer, conn);
+      connection_init(conn);
+    });
+  });
+
+  peer.on("close", () => {
+    socket.emit("leave_session");
   });
 }
 
@@ -83,21 +98,46 @@ onMounted(() => {
   // when a user connects to this session, create a new connection
   // and initialize it.
   socket.on("user_connection", (id, username) => {
-    otherUsers.set(id, username);
+    console.log("Another user connected to the session.");
     const conn = peer.connect(id);
-    connection_init(conn);
+    conn.on("open", () => {
+      otherUsers.set(id, conn);
+      connection_init(conn);
+    });
+  });
+
+  // when a user leaves this session, remove their cursor
+  socket.on("user_disconnection", (id) => {
+    const index = conns.indexOf(otherUsers.get(id));
+    if (index !== -1) {
+      conns.splice(index, 1);
+      otherUsers.delete(id);
+
+      for (let i = 0; i < cursors.value.length; i++) {
+        if (cursors[i].id === id) {
+          cursors.value.splice(i, 1);
+        }
+      }
+    }
   });
 
   // when mouse is moved, broadcast mouse position to all connections
-  // event is throttled to reduce load on connection
-  onmousemove = (e) => {
-    throttle(100, () => {
-      for (let conn of conns) {
-        conn.send({x: e.clientX, y: e.clientY});
-      }
-    });
+  function sendCursor(e, conns, username) {
+    for (let conn of conns) {
+      conn.send({ username: username, x: e.clientX / e.view.window.innerWidth, y: e.clientY / e.view.window.innerHeight });
+    }
   }
+
+  const throttledSendCursor = throttle(100, sendCursor, {
+    noLeading: false,
+    noTrailing: false,
+  })
+
+  // when mouse is moved, broadcast mouse position to all connections
+  // event is throttled to reduce load on connection
+  onmousemove = e => throttledSendCursor(e, conns, username)
 });
+
 
 function handleFileInput(e) {
   console.log(e.target.files[0]);
