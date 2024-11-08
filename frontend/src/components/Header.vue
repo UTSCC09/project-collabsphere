@@ -17,6 +17,7 @@ const { login, logout } = userstore
 
 const route = useRoute();
 const isTestSessionRoute = computed(() => route.path === '/test-session');
+const username = computed(() => userstore.username);
 
 </script>
 
@@ -25,6 +26,7 @@ const isTestSessionRoute = computed(() => route.path === '/test-session');
     <header>
         <router-link to="/" class=" hover:animate-pulse"><h1 class="text-2xl">CollabSphere</h1></router-link>
         <div class="flex h-5 m-2 mb-0" v-if="props.sessionId">
+        <p v-if="username" class="mr-2">Signed in as: {{ username }}</p>
         <p class="font-sans"><b>Session ID: </b>{{sessionId}}</p>
         <img src="../assets/copy.svg" class="flex-initial hover:opacity-50 ml-2" @click="navigator.clipboard.writeText(sessionId)" alt="Copy session id to clipboard">
         </div>

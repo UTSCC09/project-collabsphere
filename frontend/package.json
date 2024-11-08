@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "collabsphere": "file:",
+    "oh-vue-icons": "^1.0.0-rc3",
     "pdf-lib": "^1.17.1",
     "pinia": "^2.2.4",
     "socket.io": "^4.8.1",
