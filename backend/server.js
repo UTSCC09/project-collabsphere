@@ -17,7 +17,8 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: '*'
+    origin: process.env.FRONTEND,
+    credentials: true,
   }
 });
 
@@ -33,6 +34,13 @@ mongoose.connect(process.env.MONGODB_URI, {
 app.use('/api', authRoutes);
 app.use('/api', sessionRoutes);
 
+app.use(function (req, res, next) {
+  res.header("Access-Control-Allow-Origin", process.env.FRONTEND);
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.header("Access-Control-Allow-Methods", "*");
+  next();
+});
+
 // Error handling
 app.use((req, res, next) => {
   res.status(404).json({ message: 'Route not found' });
@@ -45,7 +53,7 @@ app.use((err, req, res, next) => {
 
 // only start the server if not running tests
 if (process.env.NODE_ENV !== 'test') {
-  const PORT = process.env.PORT || 5000;
+  const PORT = process.env.PORT || 4000;
   const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });

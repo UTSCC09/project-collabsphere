@@ -8,13 +8,14 @@ import DocumentReader from "@/components/DocumentReader.vue";
 
 // true if user is host
 let isHost = true; //false;
-const sessionId = "";
-const username = "";
+const sessionId = "1000a";
+const username = Math.random().toString(36).substring(7);
 
 // determines which view is currently in the main slot
 let view = ref(0);
 let mounted = ref(false);
 
+// TODO enable secure: true
 const peer = new Peer();
 // list of all connections
 const conns = [];
@@ -28,18 +29,25 @@ const itemRefs = useTemplateRef("items");
 const file = ref(null);
 
 // TODO change url below to backend
-const socket = io("wss://localhost:5173/session", {
+const socket = io("ws://localhost:3030", {
+  transports: ['websocket', 'polling', 'flashsocket'],
   withCredentials: true,
 });
 
 // modified from https://stackoverflow.com/questions/30738079/webrtc-peerjs-text-chat-connect-to-multiple-peerid-at-the-same-time
 function connection_init(conn) {
-  conn.on("open", () => {
-    // each x_coord and y_coord is unique b/c of closure
-    const x_coord = ref(0);
-    const y_coord = ref(0);
+  // each x_coord and y_coord is unique b/c of closure
+  const x_coord = ref(0);
+  const y_coord = ref(0);
 
+  console.log(conn.open);
+
+  conns.push(conn);
+
+  // TODO why does this not work?
+  conn.on("open", () => {
     conn.on("data", (data) => {
+      console.log(data);
       // TODO use interpolation
       x_coord.value = data.x;
       y_coord.value = data.y;
@@ -54,37 +62,38 @@ function connection_init(conn) {
         });
       }
     });
-    conn.on("close", () => {
-      socket.emit("leave_session");
-    });
+
     conn.on("error", (error) => {
       console.log(error);
     });
-    conns.push(conn);
   });
 }
 
 function peer_init() {
+  peer.on("open", (id) => {
+    console.log("Joining session.")
+    socket.emit("join_session", sessionId, id, username);
+  });
+
   // when a user connects with you, initialize the connection
   peer.on("connection", (conn) => {
     connection_init(conn);
   });
 
-  peer.on("open", (id) => {
-    socket.emit("join_session", sessionId, id, username);
+  peer.on("close", () => {
+    socket.emit("leave_session");
   });
 }
 
 onMounted(() => {
-  mounted.value = true;
   peer_init();
 
   // when a user connects to this session, create a new connection
   // and initialize it.
   socket.on("user_connection", (id, username) => {
     const conn = peer.connect(id);
-    otherUsers.set(id, {username: username, connection: conn});
     connection_init(conn);
+    otherUsers.set(id, {username: username, connection: conn});
   });
 
   // when a user leaves this session, remove their cursor
@@ -105,11 +114,11 @@ onMounted(() => {
   // when mouse is moved, broadcast mouse position to all connections
   // event is throttled to reduce load on connection
   onmousemove = (e) => {
-    throttle(100, () => {
+    // throttle(100, () => {
       for (let conn of conns) {
         conn.send({x: e.clientX, y: e.clientY});
       }
-    });
+    // });
   }
 });
 
