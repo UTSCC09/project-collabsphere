@@ -94,7 +94,7 @@ app.use((err, req, res, next) => {
 // only start the server if not running tests
 if (process.env.NODE_ENV !== 'test') {
   const PORT = process.env.PORT || 4000;
-  const server = app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
   
