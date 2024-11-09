@@ -186,8 +186,8 @@ const isFile = computed(() => {
         </div>
       </div>
       <div id="side-items" class="basis-1/3 ml-5">
-        <div id="top-side-item">
-          <label id="pdf-input" v-if="isHost && !isFile" class="file_upload btn">
+        <div id="top-side-item" class="justify-self-center">
+          <label id="pdf-input" v-if="isHost && !isFile" class="a-href underline font-extrabold text-xl">
             <input type="file" @input="handleFileInput" name="upload" accept="application/pdf" class="hidden" />
             Upload PDF
           </label>
