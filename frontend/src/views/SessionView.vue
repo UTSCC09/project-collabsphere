@@ -226,7 +226,7 @@ const isFile = computed(() => {
             Upload PDF
           </label>
         </div>
-        <div id="bottom-side-item">
+        <div id="bottom-side-item" class="min-h-[50vh] flex flex-col">
           <SharedNote :conn="myconn" :conns="conns" :socket="socket"/>
         </div>
       </div>

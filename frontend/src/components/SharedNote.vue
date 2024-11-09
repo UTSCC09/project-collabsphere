@@ -21,11 +21,12 @@
 </script>
 
 <template>
-    <div class="w-full h-full">
+    <div class="w-full h-full flex-1 flex flex-col">
+        <h2 class="text-2xl">Shared Note</h2>
         <textarea
             @keyup="transmit"
             v-model="note"
-            class="w-full h-full"
+            class="flex-1 bg-inherit resize-none p-2"
             placeholder="Write your note here..."
         ></textarea>
     </div>
