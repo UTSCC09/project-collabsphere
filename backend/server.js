@@ -112,7 +112,6 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnect", () => {
-      console.log(id);
       socket.to(sessionId).emit("user_disconnection", id);
       socket.leave(sessionId);
     });
