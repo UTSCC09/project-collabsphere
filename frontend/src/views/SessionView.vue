@@ -5,7 +5,7 @@ import { throttle } from 'throttle-debounce';
 import { io } from "socket.io-client";
 import CursorItem from "@/components/CursorItem.vue";
 import DocumentReader from "@/components/DocumentReader.vue";
-
+import type { Ref } from "vue";
 import { useUserdataStore } from "@/stores/userdata";
 
 
@@ -18,7 +18,9 @@ const sessionID = computed(() => {
   return useUserdataStore().sessionID;
 });
 
-const username = Math.random().toString(36).substring(7);
+const username = computed(() => {
+  return useUserdataStore().username;
+});
 
 const mounted = ref(false);
 
@@ -31,12 +33,20 @@ const peer = new Peer({
   secure: false
 });
 
+interface cursor {
+  id: any;
+  username: any;
+  x_coord: Ref<number, number>;
+  y_coord: Ref<number, number>;
+}
+
 // list of all connections
 const conns: any = [];
 // list of all peers
 const otherUsers = new Map();
 // list of all cursors
-const cursors = ref([]);
+const cursors: Ref<cursor[]> = ref([]);
+
 const itemRefs = useTemplateRef("items");
 
 // null while no file has been uploaded
@@ -83,26 +93,26 @@ function connection_init(conn) {
       // TODO problem is those who connect to new user don't share username
       cursors.value.push({
         id: conn.peer,
-        username: data.username,
+        "username": data.username,
         x_coord: x_coord,
         y_coord: y_coord
       });
     }
   });
 
-  conn.on("error", (error) => {
+  conn.on("error", (error: string) => {
     console.log(error);
   });
 }
 
 function peer_init() {
-  peer.on("open", (id) => {
-    console.log("Joining session.", sessionID.value, id, username);
-    socket.emit("join_session", sessionID.value, id, username);
+  peer.on("open", (id: string) => {
+    console.log("Joining session.", sessionID.value, id, username.value);
+    socket.emit("join_session", sessionID.value, id, username.value);
   });
 
   // when a user connects with you, initialize the connection
-  peer.on("connection", (conn) => {
+  peer.on("connection", (conn: Peer) => {
     conn.on("open", () => {
       otherUsers.set(conn.peer, conn);
       connection_init(conn);
@@ -152,7 +162,10 @@ onMounted(() => {
   });
 
   // when mouse is moved, broadcast mouse position to all connections
-  function sendCursor(e, conns, username) {
+  function sendCursor(
+      e, 
+      conns: any, 
+      username: string) {
     for (const conn of conns) {
       conn.send({ username: username, x: e.clientX / e.view.window.innerWidth, y: e.clientY / e.view.window.innerHeight });
     }
@@ -165,7 +178,7 @@ onMounted(() => {
 
   // when mouse is moved, broadcast mouse position to all connections
   // event is throttled to reduce load on connection
-  onmousemove = e => throttledSendCursor(e, conns, username)
+  onmousemove = e => throttledSendCursor(e, conns, username.value)
 });
 
 function handleFileInput(e) {

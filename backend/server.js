@@ -69,17 +69,6 @@ const peerServer = ExpressPeerServer(pServer, {
 
 app.use(peerServer);
 
-
-// // Add CORS headers for PeerServer
-// app.use('/app', (req, res, next) => {
-//   res.header("Access-Control-Allow-Origin", process.env.FRONTEND);
-//   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-//   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-//   res.header("Access-Control-Allow-Credentials", "true");
-//   next();
-// });
-
-
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,

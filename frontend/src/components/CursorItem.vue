@@ -60,7 +60,7 @@ const y = computed(() => {
           target="_blank"
           >CC 3.0 BY</a
         > -->
-  <div :id="props.username" class="cursor-item absolute pointer-events-none">
+  <div :id="props.username" class="cursor-item fixed pointer-events-none">
     <svg class="cursor h-8 w-8" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
       <path
         stroke-width="0"
