@@ -16,6 +16,11 @@ const isHost = computed(() => userstore.isHost);
 const sessionID = computed(() => userstore.sessionID);
 
 const isSessionRoute = computed(() => route.path === '/session');
+
+function copySessionID() {
+    navigator.clipboard.writeText(sessionID.value);
+}
+
 </script>
 
 <template>
@@ -25,7 +30,7 @@ const isSessionRoute = computed(() => route.path === '/session');
         <div class="flex h-5 m-2 mb-0" v-if="sessionID && isSessionRoute">
           <p class="font-sans"><b>Session ID: </b>{{sessionID}}</p>
           <!-- copy.svg is licensed with https://opensource.org/license/mit -->
-          <img src="../assets/copy.svg" class="flex-initial hover:opacity-50 ml-2" @click="navigator.clipboard.writeText(sessionID)" alt="Copy session id to clipboard">
+          <img src="../assets/copy.svg" class="flex-initial hover:opacity-50 ml-2" @click="copySessionID" alt="Copy session id to clipboard">
         </div>
 
         <div class="right-0 absolute top-0">
