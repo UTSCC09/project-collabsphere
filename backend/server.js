@@ -111,6 +111,10 @@ io.on("connection", (socket) => {
       socket.to(sessionId).emit("send_file", file);
     });
 
+    socket.on('note', (note) => {
+      socket.to(sessionId).emit('note', note);
+    });
+    
     socket.on("disconnect", () => {
       socket.to(sessionId).emit("user_disconnection", id);
       socket.leave(sessionId);

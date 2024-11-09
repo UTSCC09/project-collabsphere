@@ -7,6 +7,7 @@ import CursorItem from "@/components/CursorItem.vue";
 import DocumentReader from "@/components/DocumentReader.vue";
 import type { Ref } from "vue";
 import { useUserdataStore } from "@/stores/userdata";
+import SharedNote from "@/components/SharedNote.vue";
 
 // true if user is host
 const isHost = computed(() => {
@@ -65,10 +66,13 @@ socket.on('connect_error', (err) => {
   console.error('Socket.IO connection error:', err);
 });
 
+const myconn = ref(null);
 
 // modified from https://stackoverflow.com/questions/30738079/webrtc-peerjs-text-chat-connect-to-multiple-peerid-at-the-same-time
 function connection_init(conn) {
   conns.push(conn);
+
+  myconn.value = conn;
 
   // each x_coord and y_coord is unique b/c of closure
   const x_coord = ref(0);
@@ -81,6 +85,7 @@ function connection_init(conn) {
       return;
     }
 
+    if (!data.x || !data.y) return;
     // TODO use interpolation
     x_coord.value = data.x;
     y_coord.value = data.y;
@@ -172,6 +177,13 @@ onMounted(() => {
     noTrailing: false,
   })
 
+
+  socket.on("send_file", (new_file) => {
+    console.log("Received file from host.");
+    console.log(new_file);
+    if (!file.value) file.value = new Blob([new_file]);
+  });
+
   // when mouse is moved, broadcast mouse position to all connections
   // event is throttled to reduce load on connection
   onmousemove = e => throttledSendCursor(e, conns, username.value)
@@ -179,15 +191,9 @@ onMounted(() => {
 
 function handleFileInput(e) {
   file.value = e.target.files[0];
-
-  socket.emit("send_file", e.target.files[0]);
+  console.log("Sending file to backend.");
+  socket.emit("send_file", file.value);
 }
-
-socket.on("send_file", (new_file) => {
-  console.log(new_file);
-  if (!file.value)
-    file.value = new Blob([new_file]);
-});
 
 const isFile = computed(() => {
   return file.value !== null;
@@ -217,8 +223,8 @@ const isFile = computed(() => {
             Upload PDF
           </label>
         </div>
-        <div id="bottom-side-item">
-          <p>TEST</p>
+        <div id="bottom-side-item" class="min-h-[50vh] flex flex-col">
+          <SharedNote :conn="myconn" :conns="conns" :socket="socket"/>
         </div>
       </div>
     </div>
