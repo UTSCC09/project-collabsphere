@@ -31,7 +31,19 @@ export const signup = async (req, res) => {
       });
   
       await user.save();
-      res.status(201).json({ message: 'User registered successfully' });
+
+      res.cookie("token", token, { 
+        httpOnly: true,
+        secure: true,
+        sameSite: "none"
+      });
+  
+      res.status(201).json({
+        message: "User registered successfully",
+        username: user.username,
+        email: user.email,
+      });
+      
     } catch (error) {
       console.error('Signup Error:', error);
       res.status(500).json({ message: 'User registration failed', error });
@@ -66,6 +78,7 @@ export const signin = async (req, res) => {
 			username: user.username,
 			email: user.email,
 		});
+
   } catch (error) {
     console.error('Signin Error:', error);
     res.status(500).json({ message: 'Login failed', error });
