@@ -54,7 +54,18 @@ export const signin = async (req, res) => {
     }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.json({ message: 'Login successful', token });
+    
+		res.cookie("token", token, { 
+      httpOnly: true,
+      secure: true,
+      sameSite: "none"
+    });
+
+		res.json({
+			message: "Login successful",
+			username: user.username,
+			email: user.email,
+		});
   } catch (error) {
     console.error('Signin Error:', error);
     res.status(500).json({ message: 'Login failed', error });
