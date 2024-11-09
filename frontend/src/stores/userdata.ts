@@ -21,6 +21,11 @@ export const useUserdataStore = defineStore('userdata', () => {
       credentials: 'include',
     }).then(() => {
       isLoggedIn.value = false
+      username.value = ''
+      useremail.value = ''
+      sessionID.value = ''
+      isHost.value = false
+      
       clearLocalStorage()
     })
   }
