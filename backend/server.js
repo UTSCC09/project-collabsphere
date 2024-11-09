@@ -4,37 +4,81 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
 import sessionRoutes from './routes/sessionRoutes.js';
 import {ExpressPeerServer} from 'peer';
-import http from 'http';
 import { Server } from 'socket.io';
-
+import cors from 'cors';
+import { readFileSync } from "fs";
+import http from 'http';
+import { createServer } from "https";
+import cookieParser from 'cookie-parser';
 dotenv.config();
 
 const app = express();
 
+app.use(cors({
+  origin: process.env.FRONTEND,
+  credentials: true,
+}));
+
 app.use(express.json());
 
-const server = http.createServer(app);
+app.use(cookieParser())
 
-const io = new Server(server, {
-  cors: {
-    origin: process.env.FRONTEND,
-    credentials: true,
-  }
-});
+
+const privateKey = readFileSync( 'server.key' );
+const certificate = readFileSync( 'server.crt' );
+const config = {
+        key: privateKey,
+        cert: certificate
+};
 
 const customGenerationFunction = () =>
   (Math.random().toString(36) + "0000000000000000000").substring(2, 16);
 
-const pServer = app.listen(443);
+app.use(function (req, res, next) {
+  res.header("Access-Control-Allow-Origin", process.env.FRONTEND);
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.header("Access-Control-Allow-Methods", "*");
+  next();
+});
 
+// * Primary server
+const server = createServer(config, app);
+
+// * Peer server
+// TODO: Replace when we get a signed certificate
+const httpPeerServer = http.createServer(app);
+
+const io = new Server(httpPeerServer, {
+  cors: {
+    origin: process.env.FRONTEND,
+    methods: ["GET", "POST"],
+    credentials: true,
+  }
+});
+
+httpPeerServer.listen(3030);
+
+const pServer = app.listen(443);
 const peerServer = ExpressPeerServer(pServer, {
   debug: true,
   proxied: true,
-  path: '/app',
+  allow_discovery: true,
+  path: "/app",
   generateClientId: customGenerationFunction,
 });
 
 app.use(peerServer);
+
+
+// // Add CORS headers for PeerServer
+// app.use('/app', (req, res, next) => {
+//   res.header("Access-Control-Allow-Origin", process.env.FRONTEND);
+//   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+//   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+//   res.header("Access-Control-Allow-Credentials", "true");
+//   next();
+// });
+
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -47,13 +91,6 @@ mongoose.connect(process.env.MONGODB_URI, {
 // Routes
 app.use('/api', authRoutes);
 app.use('/api', sessionRoutes);
-
-app.use(function (req, res, next) {
-  res.header("Access-Control-Allow-Origin", process.env.FRONTEND);
-  res.header("Access-Control-Allow-Headers", "Content-Type");
-  res.header("Access-Control-Allow-Methods", "*");
-  next();
-});
 
 // Error handling
 app.use((req, res, next) => {
@@ -71,10 +108,13 @@ if (process.env.NODE_ENV !== 'test') {
   const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
+  
 }
 
 io.on("connection", (socket) => {
+  console.log("Connection Request");
   socket.on("join_session", (sessionId, id, username) => {
+    console.log("Received join request");
     socket.join(sessionId);
     socket.to(sessionId).emit("user_connection", id, username);
 
@@ -89,6 +129,6 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(3030);
+// server.listen(3030);
 // export the app for testing
 export default app;

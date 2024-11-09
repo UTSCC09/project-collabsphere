@@ -6,9 +6,18 @@ import { io } from "socket.io-client";
 import CursorItem from "@/components/CursorItem.vue";
 import DocumentReader from "@/components/DocumentReader.vue";
 
+import { useUserdataStore } from "@/stores/userdata";
+
+
 // true if user is host
-let isHost = true; //false;
-const sessionId = "1000b";
+const isHost = computed(() => {
+  return useUserdataStore().isHost;
+});
+
+const sessionID = computed(() => {
+  return useUserdataStore().sessionID;
+});
+
 const username = Math.random().toString(36).substring(7);
 
 const mounted = ref(false);
@@ -19,10 +28,11 @@ const peer = new Peer({
   port: 443,
   path: "app",
   proxied: true,
+  secure: false
 });
 
 // list of all connections
-const conns = [];
+const conns: any = [];
 // list of all peers
 const otherUsers = new Map();
 // list of all cursors
@@ -32,11 +42,21 @@ const itemRefs = useTemplateRef("items");
 // null while no file has been uploaded
 const file = ref(null);
 
-// TODO change url below to backend
-const socket = io("ws://localhost:3030", {
+console.log("Opening socket connection to backend.");
+// const socket = io(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}`, {
+const socket = io(`${import.meta.env.VITE_PUBLIC_SOCKET}`, {
   transports: ['websocket', 'polling', 'flashsocket'],
   withCredentials: true,
 });
+
+socket.on('connect', () => {
+  console.log('Socket.IO connected with ID:', socket.id);
+});
+
+socket.on('connect_error', (err) => {
+  console.error('Socket.IO connection error:', err);
+});
+
 
 // modified from https://stackoverflow.com/questions/30738079/webrtc-peerjs-text-chat-connect-to-multiple-peerid-at-the-same-time
 function connection_init(conn) {
@@ -77,8 +97,8 @@ function connection_init(conn) {
 
 function peer_init() {
   peer.on("open", (id) => {
-    console.log("Joining session.")
-    socket.emit("join_session", sessionId, id, username);
+    console.log("Joining session.", sessionID.value, id, username);
+    socket.emit("join_session", sessionID.value, id, username);
   });
 
   // when a user connects with you, initialize the connection
@@ -169,9 +189,8 @@ const isFile = computed(() => {
   <div>
     <CursorItem v-for="cursor in cursors" ref="items" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" />
     <div class="flex h-5 m-2 mb-0">
-      <p class="font-sans"><b>Session ID: </b>{{sessionId}}</p>
       <!-- copy.svg is licensed with https://opensource.org/license/mit -->
-      <img src="../assets/copy.svg" class="flex-initial hover:opacity-50 ml-1" @click="navigator.clipboard.writeText(sessionId)" alt="Copy session id to clipboard">
+      <img src="../assets/copy.svg" class="flex-initial hover:opacity-50 ml-1" @click="navigator.clipboard.writeText(sessionID)" alt="Copy session id to clipboard">
     </div>
     <hr class="my-3" />
     <div class="flex flex-row m-5">
