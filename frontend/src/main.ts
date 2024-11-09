@@ -9,9 +9,9 @@ import router from './router'
 
 
 import { OhVueIcon, addIcons } from "oh-vue-icons";
-import { IoCreate, BiBoxArrowInRight } from "oh-vue-icons/icons";
+import { IoCreate, BiBoxArrowInRight, MdLogout, MdLogin } from "oh-vue-icons/icons";
 
-addIcons(IoCreate, BiBoxArrowInRight);
+addIcons(IoCreate, BiBoxArrowInRight, MdLogout, MdLogin);
 
 const app = createApp(App)
 

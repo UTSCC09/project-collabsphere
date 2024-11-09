@@ -28,19 +28,17 @@ const sessionID = computed(() => userstore.sessionID);
         </div>
 
         <div class="right-0 absolute top-0">
-            <button v-if="isLoggedIn" class="btn w-fit"
+            <button v-if="isLoggedIn" class="btn-and-icon w-fit"
             @click="logout"
-            >Log Out</button>
-            <button v-else class="btn w-fit"
+            >
+            <v-icon name="md-logout" />
+            Log Out</button>
+            <button v-else class="btn-and-icon w-fit"
             @click="login"
-            >Log In</button>
+            >
+            <v-icon name="md-login" />
+            Log In</button>
         </div>
-    <div class="flex gap-2 mt-2 items-center">
 
-        <!-- Router link to test-session -->
-
-        <router-link to="/session" class="btn w-fit" v-if="!isTestSessionRoute">Session</router-link>
-        <router-link to="/" class="btn w-fit" v-else>Home</router-link>
-    </div>
     </header>
 </template>
