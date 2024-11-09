@@ -8,7 +8,6 @@ import DocumentReader from "@/components/DocumentReader.vue";
 import type { Ref } from "vue";
 import { useUserdataStore } from "@/stores/userdata";
 
-
 // true if user is host
 const isHost = computed(() => {
   return useUserdataStore().isHost;
@@ -47,8 +46,6 @@ const otherUsers = new Map();
 // list of all cursors
 const cursors: Ref<cursor[]> = ref([]);
 const cursorIds = [];
-
-const itemRefs = useTemplateRef("items");
 
 // null while no file has been uploaded
 const file = ref(null);
@@ -90,7 +87,6 @@ function connection_init(conn) {
 
     // if no cursor for this connection exists yet, create one
     if (!cursorIds.includes(conn.peer)) {
-      console.log("HERE");
       cursorIds.push(conn.peer);
       // TODO find a way to make it so that username is not sent every time
       // TODO problem is those who connect to new user don't share username
@@ -200,7 +196,7 @@ const isFile = computed(() => {
 
 <template>
   <div>
-    <CursorItem v-for="cursor in cursors" ref="items" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" />
+    <CursorItem v-for="cursor in cursors" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" />
     <hr class="my-3" />
     <div class="flex flex-row m-5">
       <div id="main-item" class="basis-2/3">
