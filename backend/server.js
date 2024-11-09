@@ -115,6 +115,10 @@ io.on("connection", (socket) => {
     socket.on("send_file", (file) => {
       socket.to(sessionId).emit("send_file", file);
     });
+
+    socket.on('note', (note) => {
+      socket.to(sessionId).emit('note', note);
+    });
   });
 });
 
