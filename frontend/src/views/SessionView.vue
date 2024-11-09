@@ -184,6 +184,7 @@ function handleFileInput(e) {
 }
 
 socket.on("send_file", (new_file) => {
+  console.log(new_file);
   if (!file.value)
     file.value = new Blob([new_file]);
 });
@@ -196,7 +197,7 @@ const isFile = computed(() => {
 
 <template>
   <div>
-    <CursorItem v-for="cursor in cursors" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" />
+    <CursorItem v-for="cursor in cursors" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" style="z-index:100"/>
     <hr class="my-3" />
     <div class="flex flex-row m-5">
       <div id="main-item" class="basis-2/3">
