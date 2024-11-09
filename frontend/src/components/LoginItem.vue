@@ -139,8 +139,6 @@ async function passwordReset() {
   } catch(error) {
     console.log(error);
   }
-
-  reset_stage.value = 0;
 }
 
 const isDisabled = computed(() => {
@@ -233,7 +231,7 @@ const isDisabled = computed(() => {
       </p>
     </div>
     <div v-else-if="status === 'Reset password'" class="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
-      <form class="space-y-6" @submit.prevent="requestPasswordReset" v-if="reset_stage = 0">
+      <form class="space-y-6" @submit.prevent="requestPasswordReset" v-if="reset_stage === 0">
         <div>
           <label for="email" class="form-label">Email address</label>
           <div class="mt-2">
@@ -244,22 +242,8 @@ const isDisabled = computed(() => {
         <div>
           <button type="submit" class="btn">Reset password</button>
         </div>
-        <p class="mt-10 text-center text-sm text-gray-500">
-          Already a member?
-          <a href="#" class="a-href" @click="status = 'Sign in'">Sign in</a>
-        </p>
       </form>
-      <form class="space-y-6" @submit.prevent="passwordReset" v-else-if="reset_stage = 1">
-        <div>
-          <div class="flex items-center justify-between">
-            <label for="display" class="form-label">Display name</label>
-            <p id="username-regex_error" class="text-red-400">{{username_regex_error}}</p>
-          </div>
-          <div class="mt-2">
-            <input id="username" name="username" @keyup="validate_username" v-model="username" autocomplete="username" placeholder="display name (8-20 characters)" required class="form-input">
-          </div>
-        </div>
-
+      <form class="space-y-6" @submit.prevent="passwordReset" v-else-if="reset_stage === 1">
         <div>
           <label for="email" class="form-label">Email address</label>
           <div class="mt-2">
