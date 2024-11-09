@@ -23,8 +23,9 @@ const sessionID = computed(() => userstore.sessionID);
         <router-link to="/" class=" hover:animate-pulse"><h1 class="text-2xl">CollabSphere</h1></router-link>
         <p v-if="username" class="mr-2">Signed in as: {{ username }}</p>
         <div class="flex h-5 m-2 mb-0" v-if="sessionID">
-        <p class="font-sans"><b>Session ID: </b>{{sessionID}}</p>
-        <img src="../assets/copy.svg" class="flex-initial hover:opacity-50 ml-2" @click="navigator.clipboard.writeText(sessionID)" alt="Copy session id to clipboard">
+          <p class="font-sans"><b>Session ID: </b>{{sessionID}}</p>
+          <!-- copy.svg is licensed with https://opensource.org/license/mit -->
+          <img src="../assets/copy.svg" class="flex-initial hover:opacity-50 ml-2" @click="navigator.clipboard.writeText(sessionID)" alt="Copy session id to clipboard">
         </div>
 
         <div class="right-0 absolute top-0">

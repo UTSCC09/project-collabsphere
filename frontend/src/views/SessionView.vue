@@ -163,8 +163,8 @@ onMounted(() => {
 
   // when mouse is moved, broadcast mouse position to all connections
   function sendCursor(
-      e, 
-      conns: any, 
+      e,
+      conns: any,
       username: string) {
     for (const conn of conns) {
       conn.send({ username: username, x: e.clientX / e.view.window.innerWidth, y: e.clientY / e.view.window.innerHeight });
@@ -201,10 +201,6 @@ const isFile = computed(() => {
 <template>
   <div>
     <CursorItem v-for="cursor in cursors" ref="items" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" />
-    <div class="flex h-5 m-2 mb-0">
-      <!-- copy.svg is licensed with https://opensource.org/license/mit -->
-      <img src="../assets/copy.svg" class="flex-initial hover:opacity-50 ml-1" @click="navigator.clipboard.writeText(sessionID)" alt="Copy session id to clipboard">
-    </div>
     <hr class="my-3" />
     <div class="flex flex-row m-5">
       <div id="main-item" class="basis-2/3">
