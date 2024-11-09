@@ -103,17 +103,18 @@ if (process.env.NODE_ENV !== 'test') {
 io.on("connection", (socket) => {
   console.log("Connection Request");
   socket.on("join_session", (sessionId, id, username) => {
-    console.log("Received join request");
+    console.log("Received join request from " + id);
     socket.join(sessionId);
     socket.to(sessionId).emit("user_connection", id, username);
 
-    socket.on("leave_session", () => {
-      socket.to(sessionId).emit("user_disconnection", id);
-      socket.leave(sessionId);
-    });
-
     socket.on("send_file", (file) => {
       socket.to(sessionId).emit("send_file", file);
+    });
+
+    socket.on("disconnect", () => {
+      console.log(id);
+      socket.to(sessionId).emit("user_disconnection", id);
+      socket.leave(sessionId);
     });
   });
 });
