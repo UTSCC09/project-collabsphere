@@ -46,8 +46,7 @@ const conns: any = [];
 const otherUsers = new Map();
 // list of all cursors
 const cursors: Ref<cursor[]> = ref([]);
-
-const itemRefs = useTemplateRef("items");
+const cursorIds = [];
 
 // null while no file has been uploaded
 const file = ref(null);
@@ -92,12 +91,13 @@ function connection_init(conn) {
     y_coord.value = data.y;
 
     // if no cursor for this connection exists yet, create one
-    if (!(conn.peer in itemRefs)) {
+    if (!cursorIds.includes(conn.peer)) {
+      cursorIds.push(conn.peer);
       // TODO find a way to make it so that username is not sent every time
       // TODO problem is those who connect to new user don't share username
       cursors.value.push({
         id: conn.peer,
-        "username": data.username,
+        username: data.username,
         x_coord: x_coord,
         y_coord: y_coord
       });
@@ -121,10 +121,6 @@ function peer_init() {
       otherUsers.set(conn.peer, conn);
       connection_init(conn);
     });
-  });
-
-  peer.on("close", () => {
-    socket.emit("leave_session");
   });
 }
 
@@ -158,7 +154,8 @@ onMounted(() => {
       otherUsers.delete(id);
 
       for (let i = 0; i < cursors.value.length; i++) {
-        if (cursors[i].id === id) {
+        if (cursors.value[i].id === id) {
+          cursorIds.splice(cursorIds.indexOf(id), 1);
           cursors.value.splice(i, 1);
         }
       }
@@ -206,7 +203,7 @@ const isFile = computed(() => {
 
 <template>
   <div>
-    <CursorItem v-for="cursor in cursors" ref="items" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" />
+    <CursorItem v-for="cursor in cursors" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" />
     <hr class="my-3" />
     <div class="flex flex-row m-5">
       <div id="main-item" class="basis-2/3">
