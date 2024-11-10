@@ -231,10 +231,4 @@ const isFile = computed(() => {
   </div>
 </template>
 <style scoped>
-#viewer {
-  border: 1px solid #ccc !important;
-  width: 100%;
-  height: calc(100vh - 80px);
-  overflow-y: scroll;
-}
 </style>
