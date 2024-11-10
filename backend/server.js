@@ -58,7 +58,7 @@ const io = new Server(httpPeerServer, {
 
 httpPeerServer.listen(3030);
 
-const pServer = app.listen(443);
+const pServer = app.listen(1234);
 const peerServer = ExpressPeerServer(pServer, {
   debug: true,
   proxied: true,
