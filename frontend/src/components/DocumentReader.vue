@@ -1,7 +1,10 @@
+
 <!-- This is a temporary vue item to test Document reading and segmenting -->
 <!-- Accept file as prop -->
 <script setup lang="ts" type="module">
+// @ts-nocheck
 import {onMounted, ref} from 'vue';
+// @ts-expect-error
 import * as pdfjsLib from "pdfjs-dist/build/pdf";
 import * as pdfjsViewer from "pdfjs-dist/web/pdf_viewer.mjs"
 
@@ -13,12 +16,16 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dis
 
 const PAGE_TO_VIEW = ref(1);
 const TOTAL_PAGES = ref(1);
+
 const SCALE = 1.0;
+
 let pdf = null;
+
 let pdfPageView = null;
 
 const eventBus = new pdfjsViewer.EventBus();
 
+// @ts-nocheck
 async function getPdf() {
   const fileReader = new FileReader();
 

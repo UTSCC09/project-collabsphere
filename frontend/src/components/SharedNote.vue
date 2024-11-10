@@ -1,15 +1,14 @@
 <script setup type="module" lang="ts">
-    import { defineComponent, onMounted, ref, watch } from 'vue';
+    import { defineComponent, onMounted, ref } from 'vue';
+    import type { Ref}  from 'vue';
 
     const props = defineProps<{
-        conn: any,
-        conns: any[],
         socket: any,
     }>();
 
-    const note = ref(null);
+    const note: Ref<string | null> = ref(null);
     onMounted(() => {
-        props.socket.on('note', (data) => {
+        props.socket.on('note', (data: string) => {
             note.value = data;
         });
     });
