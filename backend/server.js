@@ -3,11 +3,10 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
 import sessionRoutes from './routes/sessionRoutes.js';
-import {ExpressPeerServer} from 'peer';
+import { ExpressPeerServer } from 'peer';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import { readFileSync } from "fs";
-import http from 'http';
 import { createServer } from "https";
 import cookieParser from 'cookie-parser';
 dotenv.config();
@@ -23,12 +22,12 @@ app.use(express.json());
 
 app.use(cookieParser())
 
+const privateKey = readFileSync(process.env.SSL_PRIVATE_KEY_PATH || '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem');
+const certificate = readFileSync(process.env.SSL_CERTIFICATE_PATH || '/etc/letsencrypt/live/collabsphere.xyz/cert.pem');
 
-const privateKey = readFileSync( 'server.key' );
-const certificate = readFileSync( 'server.crt' );
 const config = {
-        key: privateKey,
-        cert: certificate
+  key: privateKey,
+  cert: certificate
 };
 
 const customGenerationFunction = () =>
@@ -45,10 +44,9 @@ app.use(function (req, res, next) {
 const server = createServer(config, app);
 
 // * Peer server
-// TODO: Replace when we get a signed certificate
-const httpPeerServer = http.createServer(app);
+const httpsSocketServer = createServer(config, app);
 
-const io = new Server(httpPeerServer, {
+const io = new Server(httpsSocketServer, {
   cors: {
     origin: process.env.FRONTEND,
     methods: ["GET", "POST"],
@@ -56,16 +54,44 @@ const io = new Server(httpPeerServer, {
   }
 });
 
-httpPeerServer.listen(3030);
+httpsSocketServer.listen(3030);
 
-const pServer = app.listen(1234);
-const peerServer = ExpressPeerServer(pServer, {
-  debug: true,
-  proxied: true,
+// const pServer = app.listen(1234);
+const peerServer = ExpressPeerServer(server, {
+  // debug: true,
+  // proxied: true,
   allow_discovery: true,
   path: "/app",
+  port: 4000,
+  // ssl: {
+  //   key: config.key,
+  //   cert: config.cert
+  // },
+  sslkey: '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem',
+  sslcert: '/etc/letsencrypt/live/collabsphere.xyz/cert.pem',
   generateClientId: customGenerationFunction,
 });
+
+// const pServer = app.listen(1234);
+// const peerServer = ExpressPeerServer(pServer, {
+//   // debug: true,
+//   // proxied: true,
+//   allow_discovery: true,
+//   path: "/app",
+//   port: 1234,
+//   // ssl: {
+//   //   key: config.key,
+//   //   cert: config.cert
+//   // },
+//   corsOptions: {
+//     origin: process.env.FRONTEND,
+//     methods: ["GET", "POST"],
+//     credentials: true,
+//   },
+//   sslkey: '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem',
+//   sslcert: '/etc/letsencrypt/live/collabsphere.xyz/cert.pem',
+//   generateClientId: customGenerationFunction,
+// });
 
 app.use(peerServer);
 
@@ -74,8 +100,8 @@ mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log('MongoDB connected successfully'))
-.catch((error) => console.error('MongoDB connection error:', error));
+  .then(() => console.log('MongoDB connected successfully'))
+  .catch((error) => console.error('MongoDB connection error:', error));
 
 // Routes
 app.use('/api', authRoutes);
@@ -97,7 +123,7 @@ if (process.env.NODE_ENV !== 'test') {
   server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
-  
+
 }
 
 io.on("connection", (socket) => {
@@ -114,7 +140,7 @@ io.on("connection", (socket) => {
     socket.on('note', (note) => {
       socket.to(sessionId).emit('note', note);
     });
-    
+
     socket.on("disconnect", () => {
       socket.to(sessionId).emit("user_disconnection", id);
       socket.leave(sessionId);
