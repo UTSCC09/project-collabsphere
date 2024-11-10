@@ -28,10 +28,10 @@ const mounted = ref(false);
 // TODO enable secure: true
 const peer = new Peer({
   host: "/",
-  port: 443,
+  port: 4000,
   path: "app",
   proxied: true,
-  secure: false
+  secure: true
 });
 
 interface cursor {

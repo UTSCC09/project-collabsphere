@@ -1,5 +1,5 @@
 # frontend/Dockerfile
-FROM node:14
+FROM node:22
 
 # Create app directory
 WORKDIR /usr/src/app
@@ -21,4 +21,4 @@ RUN npm install -g serve
 EXPOSE 80
 
 # Command to run the app
-CMD ["serve", "-p", "80", "-s", "dist"]
+CMD ["serve", "serve", "--ssl-cert", "/etc/letsencrypt/live/collabsphere.xyz/cert.pem", "--ssl-key", "/etc/letsencrypt/live/collabsphere.xyz/privkey.pem", "-s", "dist", "-p", "443"]

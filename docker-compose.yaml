@@ -10,6 +10,7 @@ services:
       - ./backend/.env
     volumes:
       - ./backend:/usr/src/app
+      - ./ssl:/usr/src/app/ssl  # Mount the ssl folder
 
   frontend:
     build:
@@ -17,5 +18,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "80:80"
+    env_file:
+      - ./frontend/.env
     volumes:
       - ./frontend:/usr/src/app
+
