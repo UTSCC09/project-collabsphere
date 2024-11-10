@@ -1,5 +1,6 @@
 <script setup lang="ts" type="module">
 import {computed, onMounted, ref, useTemplateRef} from "vue";
+// @ts-expect-error
 import { Peer } from "https://esm.sh/peerjs@1.5.4?bundle-deps"
 import { throttle } from 'throttle-debounce';
 import { io } from "socket.io-client";
@@ -46,10 +47,10 @@ const conns: any = [];
 const otherUsers = new Map();
 // list of all cursors
 const cursors: Ref<cursor[]> = ref([]);
-const cursorIds = [];
+const cursorIds: string[] = [];
 
 // null while no file has been uploaded
-const file = ref(null);
+const file: Ref<Blob | null> = ref(null);
 
 console.log("Opening socket connection to backend.");
 // const socket = io(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}`, {
@@ -68,8 +69,15 @@ socket.on('connect_error', (err) => {
 
 const myconn = ref(null);
 
+interface data {
+    x?: number,
+    y?: number,
+    username?: string,
+    file?: Blob
+}
+
 // modified from https://stackoverflow.com/questions/30738079/webrtc-peerjs-text-chat-connect-to-multiple-peerid-at-the-same-time
-function connection_init(conn) {
+function connection_init(conn: Peer) {
   conns.push(conn);
 
   myconn.value = conn;
@@ -78,8 +86,7 @@ function connection_init(conn) {
   const x_coord = ref(0);
   const y_coord = ref(0);
 
-  console.log("Connection established.");
-  conn.on("data", (data) => {
+  conn.on("data", (data: data) => {
     if (data.file) {
       file.value = new Blob([data.file]);
       return;
@@ -164,11 +171,11 @@ onMounted(() => {
 
   // when mouse is moved, broadcast mouse position to all connections
   function sendCursor(
-      e,
+      e: MouseEvent,
       conns: any,
       username: string) {
     for (const conn of conns) {
-      conn.send({ username: username, x: e.clientX / e.view.window.innerWidth, y: e.clientY / e.view.window.innerHeight });
+      conn.send({ username: username, x: e.clientX / (e.view?.window.innerWidth || 1), y: e.clientY / (e.view?.window.innerHeight || 1) });
     }
   }
 
@@ -189,8 +196,13 @@ onMounted(() => {
   onmousemove = e => throttledSendCursor(e, conns, username.value)
 });
 
-function handleFileInput(e) {
-  file.value = e.target.files[0];
+function handleFileInput(e: Event) {
+  if (!e.target) return ;
+
+  const target = e.target as HTMLInputElement;
+  if (target.files) {
+    file.value = target.files[0];
+  }
   console.log("Sending file to backend.");
   socket.emit("send_file", file.value);
 }
@@ -203,7 +215,7 @@ const isFile = computed(() => {
 
 <template>
   <div>
-    <CursorItem v-for="cursor in cursors" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" />
+    <CursorItem v-for="cursor in cursors" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" style="z-index:100"/>
     <hr class="my-3" />
     <div class="flex flex-row m-5">
       <div id="main-item" class="basis-2/3">
@@ -213,7 +225,7 @@ const isFile = computed(() => {
           </Teleport>
         </div>
         <div v-if="isFile" id="viewer">
-          <DocumentReader :file="file" />
+          <DocumentReader v-if="file" :file="file" />
         </div>
       </div>
       <div id="side-items" class="basis-1/3 ml-5">
@@ -224,17 +236,11 @@ const isFile = computed(() => {
           </label>
         </div>
         <div id="bottom-side-item" class="min-h-[50vh] flex flex-col">
-          <SharedNote :conn="myconn" :conns="conns" :socket="socket"/>
+          <SharedNote :socket="socket"/>
         </div>
       </div>
     </div>
   </div>
 </template>
 <style scoped>
-#viewer {
-  border: 1px solid #ccc !important;
-  width: 100%;
-  height: calc(100vh - 80px);
-  overflow-y: scroll;
-}
 </style>

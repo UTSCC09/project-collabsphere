@@ -41,14 +41,14 @@ export const useUserdataStore = defineStore('userdata', () => {
     saveToLocalStorage()
   }
 
-  const hostSession = (sessionId) => {
+  const hostSession = (sessionId: string) => {
     isHost.value = true
     sessionID.value = sessionId
     saveToLocalStorage()
     
   }
 
-  const joinSession = (sessionId) => {
+  const joinSession = (sessionId: string) => {
     isHost.value = false
     sessionID.value = sessionId
     saveToLocalStorage()
