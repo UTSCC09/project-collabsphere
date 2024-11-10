@@ -6,8 +6,8 @@
 
 body {
     font-family: 'Montserrat', 'Lato', sans-serif;
-    min-width: 100vw;
-    min-height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
 }
 
 @layer utilities {
@@ -42,3 +42,34 @@ body {
     }
 }
 
+
+/* Animated fade out */
+.notif-exit {
+    animation: fadeOut 0.5s;
+
+}
+
+/* Animated fade in */
+.notif-enter {
+    animation: fadeIn 0.5s;
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
