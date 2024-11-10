@@ -96,6 +96,7 @@ async function nextPage() {
 }
 
 async function downloadPDF() {
+  if (!pdf) return;
   const data = await pdf.getData();
   const file = new Blob([data]);
   // TODO change name of pdf

@@ -13,7 +13,7 @@ function createSession() {
   fetch(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session`,
     {
       credentials: 'include',
-      method: 'GET',    
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -31,12 +31,12 @@ function createSession() {
 const sessionID = ref('')
 const sessionID_error = ref('')
 
-function joinSession(e) {
+function joinSession() {
   sessionID_error.value = ''
   fetch(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}`,
     {
       credentials: 'include',
-      method: 'GET',    
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
