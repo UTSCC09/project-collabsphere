@@ -96,7 +96,7 @@ async function nextPage() {
 </script>
 
 <template>
-  <div class="justify-self-center">
+  <div id="toolbar" class="pl-2 pr-2">
     <label id="previous-page" v-if="PAGE_TO_VIEW > 1" class="a-href underline font-extrabold text-sm">
       <button type="submit" @click.prevent="previousPage"></button>Previous
     </label>
@@ -112,10 +112,17 @@ async function nextPage() {
 
 <style>
 @import "pdfjs-dist/web/pdf_viewer.css";
+
+#toolbar {
+  border: 1px solid #ccc !important;
+  border-bottom: 0 !important;
+  width: 100%;
+}
+
 #pageContainer {
   border: 1px solid #ccc !important;
   width: 100%;
-  height: calc(85vh - 80px);
+  height: calc(87.5vh - 80px);
   overflow-y: scroll;
 }
 </style>
