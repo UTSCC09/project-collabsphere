@@ -1,9 +1,11 @@
 <script  setup lang="ts" type="module">
+import { useNotificationStore } from '@/stores/notification';
 import { useUserdataStore } from '@/stores/userdata';
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 
 const userstore = useUserdataStore()
+const notificationstore = useNotificationStore()
 
 const isLoggedIn = computed(() => userstore.isLoggedIn)
 const { login, logout } = userstore
@@ -19,6 +21,7 @@ const isSessionRoute = computed(() => route.path === '/session');
 
 function copySessionID() {
     navigator.clipboard.writeText(sessionID.value);
+    notificationstore.addNotification({message:'Session ID copied to clipboard'});
 }
 
 </script>
