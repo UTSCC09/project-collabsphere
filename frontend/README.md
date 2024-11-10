@@ -37,3 +37,9 @@ npm run build
 ```sh
 npm run lint
 ```
+
+### Serving the frontend
+
+Run the following command in the frontend folder to serve the frontend on port 443 with ssl enabled:
+
+`sudo serve --ssl-cert /etc/letsencrypt/live/collabsphere.xyz/cert.pem --ssl-key /etc/letsencrypt/live/collabsphere.xyz/privkey.pem -s dist -p 443`
