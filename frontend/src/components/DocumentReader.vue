@@ -24,10 +24,11 @@ const TOTAL_PAGES = ref(1);
 const SCALE = 1.0;
 
 let pdf: PDFDocumentProxy | null = null;
-
 let pdfPageView: PDFPageView | null = null;
 
 const eventBus = new pdfjsViewer.EventBus();
+
+const downloadManager = new pdfjsViewer.DownloadManager();
 
 // @ts-nocheck
 async function getPdf() {
@@ -93,6 +94,13 @@ async function nextPage() {
     pdfPageView.draw();
   }
 }
+
+async function downloadPDF() {
+  const data = await pdf.getData();
+  const file = new Blob([data]);
+  // TODO change name of pdf
+  downloadManager.download(file, "", "download.pdf");
+}
 </script>
 
 <template>
@@ -103,6 +111,7 @@ async function nextPage() {
     <label id="previous-page" v-if="PAGE_TO_VIEW < TOTAL_PAGES" class="a-href underline font-extrabold text-sm">
       <button type="submit" @click.prevent="nextPage"></button>Next
     </label>
+    <v-icon name="la-download-solid" @click="downloadPDF" class="hover:opacity-50"/>
   </div>
   <div id="pageContainer" class="pdfViewer singlePageView"></div>
   <!--

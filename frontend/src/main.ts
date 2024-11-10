@@ -17,9 +17,9 @@ Bootstrap Icons - https://github.com/twbs/icons/blob/main/LICENSE
 Material Design Icons - https://github.com/google/material-design-icons/blob/master/LICENSE
 Prime Icons - https://github.com/primefaces/primeicons/blob/master/LICENSE
 */
-import { IoCreate, BiBoxArrowInRight, MdLogout, MdLogin, PrSpinner } from "oh-vue-icons/icons";
+import { IoCreate, BiBoxArrowInRight, MdLogout, MdLogin, PrSpinner, LaDownloadSolid } from "oh-vue-icons/icons";
 
-addIcons(IoCreate, BiBoxArrowInRight, MdLogout, MdLogin, PrSpinner);
+addIcons(IoCreate, BiBoxArrowInRight, MdLogout, MdLogin, PrSpinner, LaDownloadSolid);
 
 const app = createApp(App)
 
