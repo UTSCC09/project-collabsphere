@@ -2,14 +2,18 @@
 <!-- This is a temporary vue item to test Document reading and segmenting -->
 <!-- Accept file as prop -->
 <script setup lang="ts" type="module">
-// @ts-nocheck
 import {onMounted, ref} from 'vue';
 // @ts-expect-error
 import * as pdfjsLib from "pdfjs-dist/build/pdf";
 import * as pdfjsViewer from "pdfjs-dist/web/pdf_viewer.mjs"
+import { PDFPageView } from 'pdfjs-dist/web/pdf_viewer.mjs';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 const props = defineProps({
-  file: Object
+  file: {
+    type: Blob,
+    required: true,
+  },
 });
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.mjs"
@@ -19,9 +23,9 @@ const TOTAL_PAGES = ref(1);
 
 const SCALE = 1.0;
 
-let pdf = null;
+let pdf: PDFDocumentProxy | null = null;
 
-let pdfPageView = null;
+let pdfPageView: PDFPageView | null = null;
 
 const eventBus = new pdfjsViewer.EventBus();
 
@@ -30,12 +34,18 @@ async function getPdf() {
   const fileReader = new FileReader();
 
   fileReader.onload = async () => {
-    const container = document.getElementById("pageContainer");
+    const container = document.getElementById("pageContainer") as HTMLDivElement;
 
-    const loadingTask = pdfjsLib.getDocument(new Uint8Array(fileReader.result));
+    const loadingTask = pdfjsLib.getDocument(new Uint8Array(fileReader.result as ArrayBuffer));
 
     pdf = await loadingTask.promise;
+
+    if (!pdf) {
+      return;
+    }
+
     TOTAL_PAGES.value = pdf.numPages;
+
     const pdfPage = await pdf.getPage(PAGE_TO_VIEW.value);
     pdfPageView = new pdfjsViewer.PDFPageView({
       container,
@@ -60,6 +70,11 @@ async function previousPage() {
   if (PAGE_TO_VIEW.value - 1 >= 0 && pdf) {
     PAGE_TO_VIEW.value -= 1;
     const pdfPage = await pdf.getPage(PAGE_TO_VIEW.value);
+
+    if (!pdfPageView) {
+      return;
+    }
+
     pdfPageView.setPdfPage(pdfPage);
     pdfPageView.draw();
   }
@@ -69,6 +84,11 @@ async function nextPage() {
   if (PAGE_TO_VIEW.value < TOTAL_PAGES.value && pdf) {
     PAGE_TO_VIEW.value += 1;
     const pdfPage = await pdf.getPage(PAGE_TO_VIEW.value);
+
+    if (!pdfPageView) {
+      return;
+    }
+
     pdfPageView.setPdfPage(pdfPage);
     pdfPageView.draw();
   }
