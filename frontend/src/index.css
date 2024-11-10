@@ -8,6 +8,7 @@ body {
     font-family: 'Montserrat', 'Lato', sans-serif;
     min-width: 100vw;
     min-height: 100vh;
+    overflow: hidden;
 }
 
 @layer utilities {
