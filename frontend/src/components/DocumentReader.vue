@@ -98,12 +98,10 @@ async function nextPage() {
 <template>
   <div class="justify-self-center">
     <label id="previous-page" v-if="PAGE_TO_VIEW > 1" class="a-href underline font-extrabold text-sm">
-      <button type="submit" @click.prevent="previousPage"></button>
-      Previous
+      <button type="submit" @click.prevent="previousPage"></button>Previous
     </label>
     <label id="previous-page" v-if="PAGE_TO_VIEW < TOTAL_PAGES" class="a-href underline font-extrabold text-sm">
-      <button type="submit" @click.prevent="nextPage"></button>
-      Next
+      <button type="submit" @click.prevent="nextPage"></button>Next
     </label>
   </div>
   <div id="pageContainer" class="pdfViewer singlePageView"></div>
@@ -117,7 +115,7 @@ async function nextPage() {
 #pageContainer {
   border: 1px solid #ccc !important;
   width: 100%;
-  height: calc(100vh - 80px);
+  height: calc(85vh - 80px);
   overflow-y: scroll;
 }
 </style>
