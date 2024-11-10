@@ -26,7 +26,6 @@ function copySessionID() {
 <template>
     <header>
         <router-link to="/" class=" hover:animate-pulse"><h1 class="text-2xl">CollabSphere</h1></router-link>
-        <p v-if="isLoggedIn" class="mr-2">Signed in as: {{ username }}</p>
         <div class="flex h-5 m-2 mb-0" v-if="sessionID && isSessionRoute">
           <p class="font-sans"><b>Session ID: </b>{{sessionID}}</p>
           <!-- copy.svg is licensed with https://opensource.org/license/mit -->

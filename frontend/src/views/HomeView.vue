@@ -63,7 +63,7 @@ function joinSession(e) {
     <h1>You need an account to enjoy CollabSphere</h1>
     <LoginItem />
   </main>
-  <main v-else class="flex w-full lg:w-1/3 h-full ml-auto mr-auto items-center justify-center text-center">
+  <main v-else class="flex w-full lg:w-1/3 flex-1 ml-auto mr-auto items-center justify-center text-center">
     <div class="gap-2 flex flex-col">
     <h1 class="text-2xl font-bold">Collaborate</h1>
     <p class="text-xl">Host your own session or join a friend!</p>

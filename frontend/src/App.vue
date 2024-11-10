@@ -4,7 +4,7 @@ import Header from './components/Header.vue'
 </script>
 
 <template>
-  <div class="flex flex-col relative mx-4 my-4">
+  <div class="flex flex-col relative mx-4 my-4 flex-1">
     <Header />
     <RouterView />
   </div>
