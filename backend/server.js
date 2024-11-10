@@ -10,6 +10,7 @@ import { readFileSync } from "fs";
 import http from 'http';
 import { createServer } from "https";
 import cookieParser from 'cookie-parser';
+import path from 'path';
 dotenv.config();
 
 const app = express();
@@ -23,10 +24,14 @@ app.use(express.json());
 
 app.use(cookieParser())
 
+// Get __dirname
+const __dirname = path.resolve();
 
-const privateKey = readFileSync( 'server.key' );
-const certificate = readFileSync( 'server.crt' );
-const config = {
+
+const privateKey = readFileSync( process.env.SSL_PRIVATE_KEY_PATH || path.resolve(__dirname, "../ssl/privkey.pem") );
+const certificate = readFileSync( process.env.SSL_CERTIFICATE_PATH || path.resolve(__dirname, "../ssl/cert.pem") );
+
+const config = {  
         key: privateKey,
         cert: certificate
 };
