@@ -177,7 +177,7 @@ onMounted(() => {
     }
   }
 
-  const throttledSendCursor = throttle(100, sendCursor, {
+  const throttledSendCursor = throttle(60, sendCursor, {
     noLeading: false,
     noTrailing: false,
   })
