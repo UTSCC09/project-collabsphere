@@ -24,10 +24,11 @@ const TOTAL_PAGES = ref(1);
 const SCALE = 1.0;
 
 let pdf: PDFDocumentProxy | null = null;
-
 let pdfPageView: PDFPageView | null = null;
 
 const eventBus = new pdfjsViewer.EventBus();
+
+const downloadManager = new pdfjsViewer.DownloadManager();
 
 // @ts-nocheck
 async function getPdf() {
@@ -93,18 +94,25 @@ async function nextPage() {
     pdfPageView.draw();
   }
 }
+
+async function downloadPDF() {
+  if (!pdf) return;
+  const data = await pdf.getData();
+  const file = new Blob([data]);
+  // TODO change name of pdf
+  downloadManager.download(file, "", "download.pdf");
+}
 </script>
 
 <template>
-  <div class="justify-self-center">
+  <div id="toolbar" class="pl-2 pr-2">
     <label id="previous-page" v-if="PAGE_TO_VIEW > 1" class="a-href underline font-extrabold text-sm">
-      <button type="submit" @click.prevent="previousPage"></button>
-      Previous
+      <button type="submit" @click.prevent="previousPage"></button>Previous
     </label>
     <label id="previous-page" v-if="PAGE_TO_VIEW < TOTAL_PAGES" class="a-href underline font-extrabold text-sm">
-      <button type="submit" @click.prevent="nextPage"></button>
-      Next
+      <button type="submit" @click.prevent="nextPage"></button>Next
     </label>
+    <v-icon name="la-download-solid" @click="downloadPDF" class="hover:opacity-50"/>
   </div>
   <div id="pageContainer" class="pdfViewer singlePageView"></div>
   <!--
@@ -114,10 +122,17 @@ async function nextPage() {
 
 <style>
 @import "pdfjs-dist/web/pdf_viewer.css";
+
+#toolbar {
+  border: 1px solid #ccc !important;
+  border-bottom: 0 !important;
+  width: 100%;
+}
+
 #pageContainer {
   border: 1px solid #ccc !important;
   width: 100%;
-  height: calc(100vh - 80px);
+  height: calc(87.5vh - 80px);
   overflow-y: scroll;
 }
 </style>
