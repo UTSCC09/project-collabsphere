@@ -3,6 +3,9 @@ import { computed, ref } from 'vue';
 import LoginItem from '../components/LoginItem.vue'
 import { useUserdataStore } from '@/stores/userdata';
 import { useRouter } from 'vue-router';
+// @ts-ignore
+import fetchWrapper from '@/utils/fetchWrapper';
+
 const userstore = useUserdataStore()
 
 const isLoggedIn = computed(() => userstore.isLoggedIn)
@@ -10,7 +13,7 @@ const isLoggedIn = computed(() => userstore.isLoggedIn)
 const router = useRouter()
 
 function createSession() {
-  fetch(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session`,
+  fetchWrapper(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session`,
     {
       credentials: 'include',
       method: 'GET',
@@ -19,13 +22,11 @@ function createSession() {
       },
     }
   )
-    .then(res => res.json())
-    .then(data => {
-      console.log(data)
+  .then((data: {sessionId: string}) => {
       userstore.hostSession(data.sessionId)
       // Jump to session view
       router.push('/session')
-    })
+    }).catch(() => {})
 }
 
 const sessionID = ref('')
@@ -33,7 +34,7 @@ const sessionID_error = ref('')
 
 function joinSession() {
   sessionID_error.value = ''
-  fetch(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}`,
+  fetchWrapper(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}`,
     {
       credentials: 'include',
       method: 'GET',
@@ -41,9 +42,7 @@ function joinSession() {
         'Content-Type': 'application/json',
       },
     }
-  )
-    .then(res => res.json())
-    .then(data => {
+  ).then((data: {session: {_id: string}}) => {
       if (!data.session || !data.session._id) {
         sessionID_error.value = 'Session not found'
         return
@@ -52,7 +51,7 @@ function joinSession() {
       userstore.joinSession(data.session._id)
       // Jump to session view
       router.push('/session')
-    })
+    }).catch(() => {})
 }
 
 

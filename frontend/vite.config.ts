@@ -12,8 +12,8 @@ export default defineConfig(({mode}) => {
     return {
       server: {
         https: {
-          key: fs.readFileSync(process.env.SSL_PRIVATE_KEY_PATH || '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem'),
-          cert: fs.readFileSync(process.env.SSL_CERTIFICATE_PATH || '/etc/letsencrypt/live/collabsphere.xyz/cert.pem')
+          key: fs.readFileSync(env.VITE_SSL_PRIVATE_KEY_PATH || '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem'),
+          cert: fs.readFileSync(env.VITE_SSL_CERTIFICATE_PATH || '/etc/letsencrypt/live/collabsphere.xyz/cert.pem')
         },
         host: '0.0.0.0',
       },

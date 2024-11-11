@@ -9,6 +9,8 @@ import cors from 'cors';
 import { readFileSync } from "fs";
 import { createServer } from "https";
 import cookieParser from 'cookie-parser';
+import { verifyToken } from './middleware/authMiddleware.js';
+
 dotenv.config();
 
 const app = express();
@@ -58,7 +60,7 @@ httpsSocketServer.listen(3030);
 
 // const pServer = app.listen(1234);
 const peerServer = ExpressPeerServer(server, {
-  // debug: true,
+  debug: true,
   // proxied: true,
   allow_discovery: true,
   path: "/app",
@@ -71,27 +73,6 @@ const peerServer = ExpressPeerServer(server, {
   sslcert: '/etc/letsencrypt/live/collabsphere.xyz/cert.pem',
   generateClientId: customGenerationFunction,
 });
-
-// const pServer = app.listen(1234);
-// const peerServer = ExpressPeerServer(pServer, {
-//   // debug: true,
-//   // proxied: true,
-//   allow_discovery: true,
-//   path: "/app",
-//   port: 1234,
-//   // ssl: {
-//   //   key: config.key,
-//   //   cert: config.cert
-//   // },
-//   corsOptions: {
-//     origin: process.env.FRONTEND,
-//     methods: ["GET", "POST"],
-//     credentials: true,
-//   },
-//   sslkey: '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem',
-//   sslcert: '/etc/letsencrypt/live/collabsphere.xyz/cert.pem',
-//   generateClientId: customGenerationFunction,
-// });
 
 app.use(peerServer);
 
@@ -127,7 +108,6 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 io.on("connection", (socket) => {
-  console.log("Connection Request");
   socket.on("join_session", (sessionId, id, username) => {
     console.log("Received join request from " + id);
     socket.join(sessionId);

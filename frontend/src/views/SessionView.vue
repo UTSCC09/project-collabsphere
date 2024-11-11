@@ -9,6 +9,7 @@ import DocumentReader from "@/components/DocumentReader.vue";
 import type { Ref } from "vue";
 import { useUserdataStore } from "@/stores/userdata";
 import SharedNote from "@/components/SharedNote.vue";
+import { onBeforeRouteLeave } from "vue-router";
 
 // true if user is host
 const isHost = computed(() => {
@@ -25,7 +26,6 @@ const username = computed(() => {
 
 const mounted = ref(false);
 
-// TODO enable secure: true
 const peer = new Peer({
   host: "/",
   port: 4000,
@@ -53,7 +53,7 @@ const cursorIds: string[] = [];
 const file: Ref<Blob | null> = ref(null);
 
 console.log("Opening socket connection to backend.");
-// const socket = io(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}`, {
+
 const socket = io(`${import.meta.env.VITE_PUBLIC_SOCKET}`, {
   transports: ['websocket', 'polling', 'flashsocket'],
   withCredentials: true,
@@ -100,8 +100,6 @@ function connection_init(conn: Peer) {
     // if no cursor for this connection exists yet, create one
     if (!cursorIds.includes(conn.peer)) {
       cursorIds.push(conn.peer);
-      // TODO find a way to make it so that username is not sent every time
-      // TODO problem is those who connect to new user don't share username
       cursors.value.push({
         id: conn.peer,
         username: data.username,
@@ -192,6 +190,15 @@ onMounted(() => {
   // when mouse is moved, broadcast mouse position to all connections
   // event is throttled to reduce load on connection
   onmousemove = e => throttledSendCursor(e, conns, username.value)
+});
+
+onBeforeRouteLeave((to, from, next) => {
+  console.log("Leaving session.");
+  try {
+    socket.emit("disconnect");
+  } finally {
+    next();
+  }
 });
 
 function handleFileInput(e: Event) {

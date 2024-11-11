@@ -1,8 +1,10 @@
 <script  setup lang="ts" type="module">
 import { useNotificationStore } from '@/stores/notification';
 import { useUserdataStore } from '@/stores/userdata';
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, watch } from 'vue';
+import { useRoute,useRouter } from 'vue-router';
+
+const router = useRouter()
 
 const userstore = useUserdataStore()
 const notificationstore = useNotificationStore()
@@ -24,6 +26,20 @@ function copySessionID() {
     notificationstore.addNotification({message:'Session ID copied to clipboard'});
 }
 
+async function handleLogout() {
+    await logout();
+    notificationstore.addNotification({message:'Logged out'});
+    // Return to home page after logging out
+    router.push('/');
+}
+
+// Redirect to home page if not logged in
+watch(isLoggedIn, (value) => {
+    if (!value) {
+        router.push('/');
+    }
+});
+
 </script>
 
 <template>
@@ -37,7 +53,7 @@ function copySessionID() {
 
         <div class="right-0 absolute top-0">
             <button v-if="isLoggedIn" class="btn-and-icon w-fit"
-            @click="logout"
+            @click="handleLogout"
             >
             <v-icon name="md-logout" />
             Log Out</button>
