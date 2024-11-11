@@ -11,6 +11,13 @@ body {
     overflow: hidden;
 }
 
+#app {
+    min-width: 100vw;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
 @layer utilities {
     .main-bg-color {
         @apply bg-cyan-700

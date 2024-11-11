@@ -186,8 +186,6 @@ onMounted(() => {
 
 
   socket.on("send_file", (new_file) => {
-    console.log("Received file from host.");
-    console.log(new_file);
     if (!file.value) file.value = new Blob([new_file]);
   });
 
@@ -203,7 +201,6 @@ function handleFileInput(e: Event) {
   if (target.files) {
     file.value = target.files[0];
   }
-  console.log("Sending file to backend.");
   socket.emit("send_file", file.value);
 }
 
@@ -221,7 +218,8 @@ const isFile = computed(() => {
       <div id="main-item" class="basis-2/3">
         <div v-if="mounted">
           <Teleport :disabled="!isFile" to="#top-side-item">
-            <p>MAIN</p>
+            <h1 v-if="!isFile && !isHost" class="text-1xl">Waiting for host to upload a document...</h1>
+              
           </Teleport>
         </div>
         <div v-if="isFile" id="viewer">
@@ -230,7 +228,8 @@ const isFile = computed(() => {
       </div>
       <div id="side-items" class="basis-1/3 ml-5">
         <div id="top-side-item" class="justify-self-center">
-          <label id="pdf-input" v-if="isHost && !isFile" class="a-href underline font-extrabold text-xl">
+          <label id="pdf-input" v-if="isHost && !isFile" class="a-href w-fit text-xl btn-and-icon mb-8">
+            <v-icon name="fa-file-upload"></v-icon>
             <input type="file" @input="handleFileInput" name="upload" accept="application/pdf" class="hidden" />
             Upload PDF
           </label>
