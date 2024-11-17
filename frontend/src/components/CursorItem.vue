@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed} from "vue";
+import {computed, onMounted, watch} from "vue";
 
 const props = defineProps({
   x_coord: Number,
@@ -22,18 +22,18 @@ String.prototype.toColor = function() {
   return colors[hash];
 }
 
-/*
-function updateMyCursor(point: number[]) {
-  elm.style.setProperty("transform", `translate2d(${point[0]}px, ${point[1]}px)`)
-}
+onMounted(() => {
+  function updateMyCursor(point: number[]) {
+    elm.style.setProperty("transform", `translate2d(${point[0]}px, ${point[1]}px)`)
+  }
 
-const pc = new PerfectCursor(updateMyCursor);
+  const pc = new PerfectCursor(updateMyCursor);
 
-watch(() => [props.x_coord.value, props.y_coord.value], () => {
-  pc.addPoint([props.x_coord, props.y_coord]);
-  pc.dispose();
+  watch(() => [props.x_coord.value, props.y_coord.value], () => {
+    pc.addPoint([props.x_coord * window.innerWidth, props.y_coord * window.innerHeight]);
+    pc.dispose();
+  });
 });
- */
 
 // calculate hex string using username
 const color = props.username.toColor();
