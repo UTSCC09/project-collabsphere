@@ -15,7 +15,6 @@ export const useUserdataStore = defineStore('userdata', () => {
   }
 
   const logout = () => {
-    console.log("OOOO");
     fetch(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/signout`, {
       method: 'GET',
       credentials: 'include',
@@ -27,7 +26,9 @@ export const useUserdataStore = defineStore('userdata', () => {
       isHost.value = false
       
       clearLocalStorage()
-    })
+    }).finally(() => {
+      window.location.reload()
+    });
   }
 
   const setUsername = (name: string) => {
@@ -40,14 +41,14 @@ export const useUserdataStore = defineStore('userdata', () => {
     saveToLocalStorage()
   }
 
-  const hostSession = (sessionId) => {
+  const hostSession = (sessionId: string) => {
     isHost.value = true
     sessionID.value = sessionId
     saveToLocalStorage()
     
   }
 
-  const joinSession = (sessionId) => {
+  const joinSession = (sessionId: string) => {
     isHost.value = false
     sessionID.value = sessionId
     saveToLocalStorage()

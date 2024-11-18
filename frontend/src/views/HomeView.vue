@@ -6,16 +6,14 @@ import { useRouter } from 'vue-router';
 const userstore = useUserdataStore()
 
 const isLoggedIn = computed(() => userstore.isLoggedIn)
-const sessionID = ref('')
 
 const router = useRouter()
 
 function createSession() {
-  console.log('Create session')
   fetch(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session`,
     {
       credentials: 'include',
-      method: 'GET',    
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -28,15 +26,17 @@ function createSession() {
       // Jump to session view
       router.push('/session')
     })
-
 }
 
-function joinSession() {
+const sessionID = ref('')
+const sessionID_error = ref('')
 
+function joinSession() {
+  sessionID_error.value = ''
   fetch(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}`,
     {
       credentials: 'include',
-      method: 'GET',    
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -44,12 +44,17 @@ function joinSession() {
   )
     .then(res => res.json())
     .then(data => {
-      console.log(data)
+      if (!data.session || !data.session._id) {
+        sessionID_error.value = 'Session not found'
+        return
+      }
+
       userstore.joinSession(data.session._id)
       // Jump to session view
       router.push('/session')
     })
 }
+
 
 </script>
 
@@ -67,13 +72,16 @@ function joinSession() {
       @click="createSession"
     ><v-icon name="io-create"/> Create Session</button>
 
-
-    <input type="text" class="input" placeholder="Session ID" v-model="sessionID" />
-
-    <button class="btn-and-icon bg-gray-300 text-black"
+    <div class="grid grid-cols-9 gap-2">
+    <input type="text" placeholder="Session ID" class="form-input col-span-6" v-model="sessionID"/>
+    <button class="btn-and-icon bg-gray-300 text-black col-span-3 disabled:opacity-60"
       @click="joinSession"
       :disabled="!sessionID"
-    ><v-icon name="bi-box-arrow-in-right"/>Join Session</button>
+    >
+    <v-icon name="bi-box-arrow-in-right"/>Join</button>
+  </div>
+
+    <p class="text-red-500">{{sessionID_error}}</p>
 
     </div>
   </main>

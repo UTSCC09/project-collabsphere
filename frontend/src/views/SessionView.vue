@@ -1,5 +1,6 @@
 <script setup lang="ts" type="module">
 import {computed, onMounted, ref, useTemplateRef} from "vue";
+// @ts-expect-error
 import { Peer } from "https://esm.sh/peerjs@1.5.4?bundle-deps"
 import { throttle } from 'throttle-debounce';
 import { io } from "socket.io-client";
@@ -7,6 +8,7 @@ import CursorItem from "@/components/CursorItem.vue";
 import DocumentReader from "@/components/DocumentReader.vue";
 import type { Ref } from "vue";
 import { useUserdataStore } from "@/stores/userdata";
+import SharedNote from "@/components/SharedNote.vue";
 
 // true if user is host
 const isHost = computed(() => {
@@ -26,10 +28,10 @@ const mounted = ref(false);
 // TODO enable secure: true
 const peer = new Peer({
   host: "/",
-  port: 443,
+  port: 4000,
   path: "app",
   proxied: true,
-  secure: false
+  secure: true
 });
 
 interface cursor {
@@ -45,10 +47,10 @@ const conns: any = [];
 const otherUsers = new Map();
 // list of all cursors
 const cursors: Ref<cursor[]> = ref([]);
-const cursorIds = [];
+const cursorIds: string[] = [];
 
 // null while no file has been uploaded
-const file = ref(null);
+const file: Ref<Blob | null> = ref(null);
 
 console.log("Opening socket connection to backend.");
 // const socket = io(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}`, {
@@ -65,22 +67,32 @@ socket.on('connect_error', (err) => {
   console.error('Socket.IO connection error:', err);
 });
 
+const myconn = ref(null);
+
+interface data {
+    x?: number,
+    y?: number,
+    username?: string,
+    file?: Blob
+}
 
 // modified from https://stackoverflow.com/questions/30738079/webrtc-peerjs-text-chat-connect-to-multiple-peerid-at-the-same-time
-function connection_init(conn) {
+function connection_init(conn: Peer) {
   conns.push(conn);
+
+  myconn.value = conn;
 
   // each x_coord and y_coord is unique b/c of closure
   const x_coord = ref(0);
   const y_coord = ref(0);
 
-  console.log("Connection established.");
-  conn.on("data", (data) => {
+  conn.on("data", (data: data) => {
     if (data.file) {
       file.value = new Blob([data.file]);
       return;
     }
 
+    if (!data.x || !data.y) return;
     // TODO use interpolation
     x_coord.value = data.x;
     y_coord.value = data.y;
@@ -159,11 +171,11 @@ onMounted(() => {
 
   // when mouse is moved, broadcast mouse position to all connections
   function sendCursor(
-      e,
+      e: MouseEvent,
       conns: any,
       username: string) {
     for (const conn of conns) {
-      conn.send({ username: username, x: e.clientX / e.view.window.innerWidth, y: e.clientY / e.view.window.innerHeight });
+      conn.send({ username: username, x: e.clientX / (e.view?.window.innerWidth || 1), y: e.clientY / (e.view?.window.innerHeight || 1) });
     }
   }
 
@@ -172,21 +184,28 @@ onMounted(() => {
     noTrailing: false,
   })
 
+
+  socket.on("send_file", (new_file) => {
+    console.log("Received file from host.");
+    console.log(new_file);
+    if (!file.value) file.value = new Blob([new_file]);
+  });
+
   // when mouse is moved, broadcast mouse position to all connections
   // event is throttled to reduce load on connection
   onmousemove = e => throttledSendCursor(e, conns, username.value)
 });
 
-function handleFileInput(e) {
-  file.value = e.target.files[0];
+function handleFileInput(e: Event) {
+  if (!e.target) return ;
 
-  socket.emit("send_file", e.target.files[0]);
+  const target = e.target as HTMLInputElement;
+  if (target.files) {
+    file.value = target.files[0];
+  }
+  console.log("Sending file to backend.");
+  socket.emit("send_file", file.value);
 }
-
-socket.on("send_file", (new_file) => {
-  if (!file.value)
-    file.value = new Blob([new_file]);
-});
 
 const isFile = computed(() => {
   return file.value !== null;
@@ -196,7 +215,7 @@ const isFile = computed(() => {
 
 <template>
   <div>
-    <CursorItem v-for="cursor in cursors" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" />
+    <CursorItem v-for="cursor in cursors" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" style="z-index:100"/>
     <hr class="my-3" />
     <div class="flex flex-row m-5">
       <div id="main-item" class="basis-2/3">
@@ -206,7 +225,7 @@ const isFile = computed(() => {
           </Teleport>
         </div>
         <div v-if="isFile" id="viewer">
-          <DocumentReader :file="file" />
+          <DocumentReader v-if="file" :file="file" />
         </div>
       </div>
       <div id="side-items" class="basis-1/3 ml-5">
@@ -216,18 +235,12 @@ const isFile = computed(() => {
             Upload PDF
           </label>
         </div>
-        <div id="bottom-side-item">
-          <p>TEST</p>
+        <div id="bottom-side-item" class="min-h-[50vh] flex flex-col">
+          <SharedNote :socket="socket"/>
         </div>
       </div>
     </div>
   </div>
 </template>
 <style scoped>
-#viewer {
-  border: 1px solid #ccc !important;
-  width: 100%;
-  height: calc(100vh - 80px);
-  overflow-y: scroll;
-}
 </style>

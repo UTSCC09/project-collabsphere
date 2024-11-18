@@ -1,0 +1,25 @@
+version: '3'
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/usr/src/app
+      - ./ssl:/usr/src/app/ssl  # Mount the ssl folder
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    env_file:
+      - ./frontend/.env
+    volumes:
+      - ./frontend:/usr/src/app
+
