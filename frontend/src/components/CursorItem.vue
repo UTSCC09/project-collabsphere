@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {computed, onMounted, watch} from "vue";
+import {PerfectCursor} from "perfect-cursors";
 
 const props = defineProps<{
   x_coord: number,
@@ -23,14 +24,16 @@ const toColor = function(value: string): string {
 }
 
 onMounted(() => {
+  const elm = document.getElementById(props.username);
+
   function updateMyCursor(point: number[]) {
-    elm.style.setProperty("transform", `translate2d(${point[0]}px, ${point[1]}px)`)
+    elm.style.setProperty("transform", `translate(${point[0]}px, ${point[1]}px)`)
   }
 
   const pc = new PerfectCursor(updateMyCursor);
 
-  watch(() => [props.x_coord.value, props.y_coord.value], () => {
-    pc.addPoint([props.x_coord * window.innerWidth, props.y_coord * window.innerHeight]);
+  watch(() => [props.x_coord, props.y_coord], ([newX, newY]) => {
+    pc.addPoint([newX * window.innerWidth, newY * window.innerHeight]);
     pc.dispose();
   });
 });
