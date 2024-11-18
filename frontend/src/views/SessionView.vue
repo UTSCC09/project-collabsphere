@@ -52,6 +52,8 @@ const cursorIds: string[] = [];
 // null while no file has been uploaded
 const file: Ref<Blob | null> = ref(null);
 
+const documentReaderRef: Ref<Component | null> = ref(null);
+
 console.log("Opening socket connection to backend.");
 // const socket = io(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}`, {
 const socket = io(`${import.meta.env.VITE_PUBLIC_SOCKET}`, {
@@ -89,6 +91,11 @@ function connection_init(conn: Peer) {
   conn.on("data", (data: data) => {
     if (data.file) {
       file.value = new Blob([data.file]);
+      return;
+    }
+
+    if (data.annotations) {
+      documentReaderRef.value.importAnnotations(data.annotations);
       return;
     }
 
@@ -196,6 +203,12 @@ onMounted(() => {
   onmousemove = e => throttledSendCursor(e, conns, username.value)
 });
 
+function sendAnnotations(annotations) {
+  for (const conn of conns) {
+    conn.send({annotations: annotations});
+  }
+}
+
 function handleFileInput(e: Event) {
   if (!e.target) return ;
 
@@ -225,7 +238,7 @@ const isFile = computed(() => {
           </Teleport>
         </div>
         <div v-if="isFile" id="viewer">
-          <DocumentReader v-if="file" :file="file" />
+          <DocumentReader v-if="file" :file="file" ref="documentReaderRef" @sendAnnotations="sendAnnotations"/>
         </div>
       </div>
       <div id="side-items" class="basis-1/3 ml-5">

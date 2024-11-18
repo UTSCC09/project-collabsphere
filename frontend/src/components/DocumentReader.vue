@@ -2,7 +2,7 @@
 <!-- This is a temporary vue item to test Document reading and segmenting -->
 <!-- Accept file as prop -->
 <script setup lang="ts" type="module">
-import {onMounted, ref} from 'vue';
+import {onMounted} from 'vue';
 // @ts-expect-error
 import { TsPdfViewer, TsPdfViewerOptions } from "ts-pdf";
 import {throttle} from "throttle-debounce";
@@ -14,11 +14,18 @@ const props = defineProps({
   },
 });
 
+const emits = defineEmits(["sendAnnotations"]);
+
 let viewer = null;
 
 async function sendAnnotations() {
   const annotations = await viewer.exportAnnotationsAsync()
   // send the annotations to the other users
+  emits("sendAnnotations", annotations);
+}
+
+async function importAnnotations(annotations) {
+  await viewer.importAnnotationsAsync(annotations);
 }
 
 const throttledSendAnnotations = throttle(100, sendAnnotations, {
@@ -38,6 +45,10 @@ async function run(): Promise<void> {
 
 onMounted(() => {
   run();
+});
+
+defineExpose({
+  importAnnotations,
 });
 </script>
 
