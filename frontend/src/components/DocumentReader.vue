@@ -5,6 +5,7 @@
 import {onMounted, ref} from 'vue';
 // @ts-expect-error
 import { TsPdfViewer, TsPdfViewerOptions } from "ts-pdf";
+import {throttle} from "throttle-debounce";
 
 const props = defineProps({
   file: {
@@ -13,37 +14,38 @@ const props = defineProps({
   },
 });
 
+let viewer = null;
+
+async function sendAnnotations() {
+  const annotations = await viewer.exportAnnotationsAsync()
+  // send the annotations to the other users
+}
+
+const throttledSendAnnotations = throttle(100, sendAnnotations, {
+  noLeading: false,
+  noTrailing: true,
+});
+
 async function run(): Promise<void> {
   const options: TsPdfViewerOptions = {
     containerSelector: "#pageContainer",
     workerSource: "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.mjs",
-    // you can check other properties using your editor hints
+    annotChangeCallback: throttledSendAnnotations,
   };
-  const viewer = new TsPdfViewer(options);
+  viewer = new TsPdfViewer(options);
   await viewer.openPdfAsync(props.file);
 }
 
 onMounted(() => {
   run();
 });
-
 </script>
+
 <template>
   <div id="pageContainer" class="pdfViewer singlePageView"></div>
-  <!--
-  <iframe src="https://mozilla.github.io/pdf.js/web/viewer.html?file=compressed.tracemonkey-pldi-09.pdf" width="100%" height="100%" frameborder="0" />
-  -->
 </template>
 
 <style>
-@import "pdfjs-dist/web/pdf_viewer.css";
-
-#toolbar {
-  border: 1px solid #ccc !important;
-  border-bottom: 0 !important;
-  width: 100%;
-}
-
 #pageContainer {
   border: 1px solid #ccc !important;
   width: 100%;
