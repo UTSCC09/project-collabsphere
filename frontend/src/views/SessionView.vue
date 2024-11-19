@@ -1,12 +1,10 @@
 <script setup lang="ts" type="module">
-import {computed, onMounted, ref, useTemplateRef} from "vue";
-// @ts-expect-error
+import { computed, onMounted, ref, Ref } from "vue";
 import { Peer } from "https://esm.sh/peerjs@1.5.4?bundle-deps"
 import { throttle } from 'throttle-debounce';
 import { io } from "socket.io-client";
 import CursorItem from "@/components/CursorItem.vue";
 import DocumentReader from "@/components/DocumentReader.vue";
-import type { Ref } from "vue";
 import { useUserdataStore } from "@/stores/userdata";
 import SharedNote from "@/components/SharedNote.vue";
 
@@ -44,17 +42,13 @@ interface cursor {
 const conns: any = [];
 // list of all peers
 const otherUsers = new Map();
-// mapping of all peerIds to their usernames
-const userIds = new Map();
 // list of all cursors
 const cursors: Ref<cursor[]> = ref([]);
 const cursorIds: string[] = [];
-
 // null while no file has been uploaded
 const file: Ref<Blob | null> = ref(null);
 
 console.log("Opening socket connection to backend.");
-// const socket = io(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}`, {
 const socket = io(`${import.meta.env.VITE_PUBLIC_SOCKET}`, {
   transports: ['websocket', 'polling', 'flashsocket'],
   withCredentials: true,
@@ -68,8 +62,6 @@ socket.on('connect_error', (err) => {
   console.error('Socket.IO connection error:', err);
 });
 
-const myconn = ref(null);
-
 interface data {
     x?: number,
     y?: number,
@@ -81,15 +73,13 @@ interface data {
 function connection_init(conn: Peer) {
   conns.push(conn);
 
-  myconn.value = conn;
-
   // each x_coord and y_coord is unique b/c of closure
   const x_coord = ref(0);
   const y_coord = ref(0);
 
   conn.on("data", (data: data) => {
     if (data.username) {
-      userIds.set(conn.peer, data.username);
+      otherUsers.get(conn.peer).username = data.username;
       return;
     }
 
@@ -98,7 +88,7 @@ function connection_init(conn: Peer) {
       return;
     }
 
-    if (!data.x || !data.y || !userIds.get(conn.peer)) return;
+    if (!data.x || !data.y || !otherUsers.get(conn.peer)) return;
     // TODO use interpolation
     x_coord.value = data.x;
     y_coord.value = data.y;
@@ -108,7 +98,7 @@ function connection_init(conn: Peer) {
       cursorIds.push(conn.peer);
       cursors.value.push({
         id: conn.peer,
-        username: userIds.get(conn.peer),
+        username: otherUsers.get(conn.peer).username,
         x_coord: x_coord,
         y_coord: y_coord
       });
@@ -129,7 +119,7 @@ function peer_init() {
   // when a user connects with you, initialize the connection
   peer.on("connection", (conn: Peer) => {
     conn.on("open", () => {
-      otherUsers.set(conn.peer, conn);
+      otherUsers.set(conn.peer, {conn: conn});
       connection_init(conn);
       // send your username to the other user
       conn.send({username: username.value});
@@ -147,7 +137,7 @@ onMounted(() => {
     console.log("Another user connected to the session.");
     const conn = peer.connect(id);
     conn.on("open", () => {
-      otherUsers.set(conn.peer, conn);
+      otherUsers.set(conn.peer, {conn: conn});
       connection_init(conn);
       // send your username to the other user
       conn.send({username: username.value});
@@ -164,10 +154,8 @@ onMounted(() => {
 
   // when a user leaves this session, remove their cursor
   socket.on("user_disconnection", (id) => {
-    console.log(otherUsers);
-    const index = conns.indexOf(otherUsers.get(id));
+    const index = conns.indexOf(otherUsers.get(id).conn);
     if (index !== -1) {
-      userIds.delete(conns[index].peer)
       conns.splice(index, 1);
       otherUsers.delete(id);
 
@@ -192,8 +180,7 @@ onMounted(() => {
   const throttledSendCursor = throttle(50, sendCursor, {
     noLeading: false,
     noTrailing: false,
-  })
-
+  });
 
   socket.on("send_file", (new_file) => {
     console.log("Received file from host.");
@@ -203,7 +190,7 @@ onMounted(() => {
 
   // when mouse is moved, broadcast mouse position to all connections
   // event is throttled to reduce load on connection
-  onmousemove = e => throttledSendCursor(e, conns, username.value)
+  onmousemove = e => throttledSendCursor(e, conns);
 });
 
 function handleFileInput(e: Event) {
