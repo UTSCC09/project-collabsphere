@@ -31,13 +31,6 @@ const peer = new Peer({
   secure: true
 });
 
-interface cursor {
-  id: any;
-  username: any;
-  x_coord: Ref<number, number>;
-  y_coord: Ref<number, number>;
-}
-
 // list of all connections
 const conns: any = [];
 // list of all peers
@@ -48,7 +41,21 @@ const cursorIds: string[] = [];
 // null while no file has been uploaded
 const file: Ref<Blob | null> = ref(null);
 
-console.log("Opening socket connection to backend.");
+interface data {
+  x?: number,
+  y?: number,
+  username?: string,
+  file?: Blob
+}
+
+interface cursor {
+  id: any;
+  username: string;
+  x_coord: Ref<number>;
+  y_coord: Ref<number>;
+}
+
+// opens socket connection to backend
 const socket = io(`${import.meta.env.VITE_PUBLIC_SOCKET}`, {
   transports: ['websocket', 'polling', 'flashsocket'],
   withCredentials: true,
@@ -61,13 +68,6 @@ socket.on('connect', () => {
 socket.on('connect_error', (err) => {
   console.error('Socket.IO connection error:', err);
 });
-
-interface data {
-    x?: number,
-    y?: number,
-    username?: string,
-    file?: Blob
-}
 
 // modified from https://stackoverflow.com/questions/30738079/webrtc-peerjs-text-chat-connect-to-multiple-peerid-at-the-same-time
 function connection_init(conn: Peer) {
@@ -88,7 +88,8 @@ function connection_init(conn: Peer) {
       return;
     }
 
-    if (!data.x || !data.y || !otherUsers.get(conn.peer)) return;
+    // check if username has not been received, or data is not x or y coordinates
+    if (!data.x || !data.y || !otherUsers.get(conn.peer).username) return;
     // TODO use interpolation
     x_coord.value = data.x;
     y_coord.value = data.y;
@@ -119,8 +120,8 @@ function peer_init() {
   // when a user connects with you, initialize the connection
   peer.on("connection", (conn: Peer) => {
     conn.on("open", () => {
-      otherUsers.set(conn.peer, {conn: conn});
       connection_init(conn);
+      otherUsers.set(conn.peer, {conn: conn});
       // send your username to the other user
       conn.send({username: username.value});
     });
@@ -137,11 +138,12 @@ onMounted(() => {
     console.log("Another user connected to the session.");
     const conn = peer.connect(id);
     conn.on("open", () => {
-      otherUsers.set(conn.peer, {conn: conn});
       connection_init(conn);
+      otherUsers.set(conn.peer, {conn: conn});
       // send your username to the other user
       conn.send({username: username.value});
 
+      // send file if it exists and current user is the host
       if (file.value && isHost) {
         const fileReader = new FileReader();
         fileReader.onload = async () => {
@@ -155,9 +157,10 @@ onMounted(() => {
   // when a user leaves this session, remove their cursor
   socket.on("user_disconnection", (id) => {
     const index = conns.indexOf(otherUsers.get(id).conn);
+    otherUsers.delete(id);
+    
     if (index !== -1) {
       conns.splice(index, 1);
-      otherUsers.delete(id);
 
       for (let i = 0; i < cursors.value.length; i++) {
         if (cursors.value[i].id === id) {
