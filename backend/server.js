@@ -128,10 +128,10 @@ if (process.env.NODE_ENV !== 'test') {
 
 io.on("connection", (socket) => {
   console.log("Connection Request");
-  socket.on("join_session", (sessionId, id, username) => {
+  socket.on("join_session", (sessionId, id) => {
     console.log("Received join request from " + id);
     socket.join(sessionId);
-    socket.to(sessionId).emit("user_connection", id, username);
+    socket.to(sessionId).emit("user_connection", id);
 
     socket.on("send_file", (file) => {
       socket.to(sessionId).emit("send_file", file);

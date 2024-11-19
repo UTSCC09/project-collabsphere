@@ -45,6 +45,8 @@ interface cursor {
 const conns: any = [];
 // list of all peers
 const otherUsers = new Map();
+// mapping of all peerIds to their usernames
+const userIds = new Map();
 // list of all cursors
 const cursors: Ref<cursor[]> = ref([]);
 const cursorIds: string[] = [];
@@ -87,12 +89,17 @@ function connection_init(conn: Peer) {
   const y_coord = ref(0);
 
   conn.on("data", (data: data) => {
+    if (data.username) {
+      userIds.set(conn.peer, data.username);
+      return;
+    }
+
     if (data.file) {
       file.value = new Blob([data.file]);
       return;
     }
 
-    if (!data.x || !data.y) return;
+    if (!data.x || !data.y || !userIds.get(conn.peer)) return;
     // TODO use interpolation
     x_coord.value = data.x;
     y_coord.value = data.y;
@@ -104,7 +111,7 @@ function connection_init(conn: Peer) {
       // TODO problem is those who connect to new user don't share username
       cursors.value.push({
         id: conn.peer,
-        username: data.username,
+        username: userIds.get(conn.peer),
         x_coord: x_coord,
         y_coord: y_coord
       });
@@ -119,7 +126,7 @@ function connection_init(conn: Peer) {
 function peer_init() {
   peer.on("open", (id: string) => {
     console.log("Joining session.", sessionID.value, id, username.value);
-    socket.emit("join_session", sessionID.value, id, username.value);
+    socket.emit("join_session", sessionID.value, id);
   });
 
   // when a user connects with you, initialize the connection
@@ -127,6 +134,8 @@ function peer_init() {
     conn.on("open", () => {
       otherUsers.set(conn.peer, conn);
       connection_init(conn);
+      // send your username to the other user
+      conn.send({username: username.value});
     });
   });
 }
@@ -137,12 +146,15 @@ onMounted(() => {
 
   // when a user connects to this session, create a new connection
   // and initialize it.
-  socket.on("user_connection", (id, username) => {
+  socket.on("user_connection", (id) => {
     console.log("Another user connected to the session.");
     const conn = peer.connect(id);
     conn.on("open", () => {
-      otherUsers.set(id, conn);
+      otherUsers.set(conn.peer, conn);
       connection_init(conn);
+      // send your username to the other user
+      conn.send({username: username.value});
+
       if (file.value && isHost) {
         const fileReader = new FileReader();
         fileReader.onload = async () => {
@@ -155,8 +167,10 @@ onMounted(() => {
 
   // when a user leaves this session, remove their cursor
   socket.on("user_disconnection", (id) => {
+    console.log(otherUsers);
     const index = conns.indexOf(otherUsers.get(id));
     if (index !== -1) {
+      userIds.delete(conns[index].peer)
       conns.splice(index, 1);
       otherUsers.delete(id);
 
@@ -172,14 +186,13 @@ onMounted(() => {
   // when mouse is moved, broadcast mouse position to all connections
   function sendCursor(
       e: MouseEvent,
-      conns: any,
-      username: string) {
+      conns: any) {
     for (const conn of conns) {
-      conn.send({ username: username, x: e.clientX / (e.view?.window.innerWidth || 1), y: e.clientY / (e.view?.window.innerHeight || 1) });
+      conn.send({ x: e.clientX / (e.view?.window.innerWidth || 1), y: e.clientY / (e.view?.window.innerHeight || 1) });
     }
   }
 
-  const throttledSendCursor = throttle(100, sendCursor, {
+  const throttledSendCursor = throttle(50, sendCursor, {
     noLeading: false,
     noTrailing: false,
   })
