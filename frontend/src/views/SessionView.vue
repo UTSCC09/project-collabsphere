@@ -25,7 +25,6 @@ const username = computed(() => {
 
 const mounted = ref(false);
 
-// TODO enable secure: true
 const peer = new Peer({
   host: "/",
   port: 4000,
@@ -107,8 +106,6 @@ function connection_init(conn: Peer) {
     // if no cursor for this connection exists yet, create one
     if (!cursorIds.includes(conn.peer)) {
       cursorIds.push(conn.peer);
-      // TODO find a way to make it so that username is not sent every time
-      // TODO problem is those who connect to new user don't share username
       cursors.value.push({
         id: conn.peer,
         username: userIds.get(conn.peer),
