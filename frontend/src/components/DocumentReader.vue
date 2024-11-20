@@ -2,12 +2,10 @@
 <!-- This is a temporary vue item to test Document reading and segmenting -->
 <!-- Accept file as prop -->
 <script setup lang="ts" type="module">
-import {onMounted, ref} from 'vue';
+import {onMounted} from 'vue';
 // @ts-expect-error
-import * as pdfjsLib from "pdfjs-dist/build/pdf";
-import * as pdfjsViewer from "pdfjs-dist/web/pdf_viewer.mjs"
-import { PDFPageView } from 'pdfjs-dist/web/pdf_viewer.mjs';
-import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { TsPdfViewer, TsPdfViewerOptions } from "ts-pdf";
+import {throttle} from "throttle-debounce";
 
 const props = defineProps({
   file: {
@@ -16,119 +14,49 @@ const props = defineProps({
   },
 });
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.mjs"
+const emits = defineEmits(["sendAnnotations"]);
 
-const PAGE_TO_VIEW = ref(1);
-const TOTAL_PAGES = ref(1);
+let viewer = null;
 
-const SCALE = 1.0;
+async function sendAnnotations() {
+  const annotations = await viewer.exportAnnotationsAsync()
+  // send the annotations to the other users
+  emits("sendAnnotations", annotations);
+}
 
-let pdf: PDFDocumentProxy | null = null;
-let pdfPageView: PDFPageView | null = null;
+async function importAnnotations(annotations) {
+  await viewer.importAnnotationsAsync(annotations);
+}
 
-const eventBus = new pdfjsViewer.EventBus();
+const throttledSendAnnotations = throttle(100, sendAnnotations, {
+  noLeading: false,
+  noTrailing: true,
+});
 
-const downloadManager = new pdfjsViewer.DownloadManager();
-
-// @ts-nocheck
-async function getPdf() {
-  const fileReader = new FileReader();
-
-  fileReader.onload = async () => {
-    const container = document.getElementById("pageContainer") as HTMLDivElement;
-
-    const loadingTask = pdfjsLib.getDocument(new Uint8Array(fileReader.result as ArrayBuffer));
-
-    pdf = await loadingTask.promise;
-
-    if (!pdf) {
-      return;
-    }
-
-    TOTAL_PAGES.value = pdf.numPages;
-
-    const pdfPage = await pdf.getPage(PAGE_TO_VIEW.value);
-    pdfPageView = new pdfjsViewer.PDFPageView({
-      container,
-      id: PAGE_TO_VIEW.value,
-      scale: SCALE,
-      defaultViewport: pdfPage.getViewport({ scale: SCALE }),
-      eventBus,
-    });
-
-    pdfPageView.setPdfPage(pdfPage);
-    pdfPageView.draw();
+async function run(): Promise<void> {
+  const options: TsPdfViewerOptions = {
+    containerSelector: "#pageContainer",
+    workerSource: "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.mjs",
+    annotChangeCallback: throttledSendAnnotations,
   };
-
-  fileReader.readAsArrayBuffer(props.file);
+  viewer = new TsPdfViewer(options);
+  await viewer.openPdfAsync(props.file);
 }
 
 onMounted(() => {
-  getPdf();
+  run();
 });
 
-async function previousPage() {
-  if (PAGE_TO_VIEW.value - 1 >= 0 && pdf) {
-    PAGE_TO_VIEW.value -= 1;
-    const pdfPage = await pdf.getPage(PAGE_TO_VIEW.value);
-
-    if (!pdfPageView) {
-      return;
-    }
-
-    pdfPageView.setPdfPage(pdfPage);
-    pdfPageView.draw();
-  }
-}
-
-async function nextPage() {
-  if (PAGE_TO_VIEW.value < TOTAL_PAGES.value && pdf) {
-    PAGE_TO_VIEW.value += 1;
-    const pdfPage = await pdf.getPage(PAGE_TO_VIEW.value);
-
-    if (!pdfPageView) {
-      return;
-    }
-
-    pdfPageView.setPdfPage(pdfPage);
-    pdfPageView.draw();
-  }
-}
-
-async function downloadPDF() {
-  if (!pdf) return;
-  const data = await pdf.getData();
-  const file = new Blob([data]);
-  // TODO change name of pdf
-  downloadManager.download(file, "", "download.pdf");
-}
+defineExpose({
+  importAnnotations,
+});
 </script>
 
 <template>
-  <div id="toolbar" class="pl-2 pr-2">
-    <label id="previous-page" v-if="PAGE_TO_VIEW > 1" class="a-href underline font-extrabold text-sm">
-      <button type="submit" @click.prevent="previousPage"></button>Previous
-    </label>
-    <label id="previous-page" v-if="PAGE_TO_VIEW < TOTAL_PAGES" class="a-href underline font-extrabold text-sm">
-      <button type="submit" @click.prevent="nextPage"></button>Next
-    </label>
-    <v-icon name="la-download-solid" @click="downloadPDF" class="hover:opacity-50"/>
-  </div>
   <div id="pageContainer" class="pdfViewer singlePageView"></div>
-  <!--
-  <iframe src="https://mozilla.github.io/pdf.js/web/viewer.html?file=compressed.tracemonkey-pldi-09.pdf" width="100%" height="100%" frameborder="0" />
-  -->
 </template>
 
 <style>
-@import "pdfjs-dist/web/pdf_viewer.css";
-
-#toolbar {
-  border: 1px solid #ccc !important;
-  border-bottom: 0 !important;
-  width: 100%;
-}
-
 #pageContainer {
   border: 1px solid #ccc !important;
   width: 100%;

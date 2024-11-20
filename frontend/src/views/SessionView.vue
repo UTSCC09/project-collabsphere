@@ -1,5 +1,5 @@
 <script setup lang="ts" type="module">
-import { computed, onMounted, ref, Ref } from "vue";
+import { computed, onMounted, ref, Ref, Component } from "vue";
 import { Peer } from "https://esm.sh/peerjs@1.5.4?bundle-deps"
 import { throttle } from 'throttle-debounce';
 import { io } from "socket.io-client";
@@ -40,12 +40,14 @@ const cursors: Ref<cursor[]> = ref([]);
 const cursorIds: string[] = [];
 // null while no file has been uploaded
 const file: Ref<Blob | null> = ref(null);
+const documentReaderRef: Ref<Component | null> = ref(null);
 
 interface data {
   x?: number,
   y?: number,
   username?: string,
-  file?: Blob
+  file?: Blob,
+  annotations?: any,
 }
 
 interface cursor {
@@ -88,8 +90,14 @@ function connection_init(conn: Peer) {
       return;
     }
 
+    if (data.annotations) {
+      documentReaderRef.value.importAnnotations(data.annotations);
+      return;
+    }
+
     // check if username has not been received, or data is not x or y coordinates
     if (!data.x || !data.y || !otherUsers.get(conn.peer).username) return;
+
     // TODO use interpolation
     x_coord.value = data.x;
     y_coord.value = data.y;
@@ -190,6 +198,12 @@ onMounted(() => {
   onmousemove = e => throttledSendCursor(e, conns);
 });
 
+function sendAnnotations(annotations) {
+  for (const conn of conns) {
+    conn.send({annotations: annotations});
+  }
+}
+
 function handleFileInput(e: Event) {
   if (!e.target) return ;
 
@@ -224,7 +238,7 @@ const isFile = computed(() => {
           </Teleport>
         </div>
         <div v-if="isFile" id="viewer">
-          <DocumentReader v-if="file" :file="file" />
+          <DocumentReader v-if="file" :file="file" ref="documentReaderRef" @sendAnnotations="sendAnnotations"/>
         </div>
       </div>
       <div id="side-items" class="basis-1/3 ml-5">
