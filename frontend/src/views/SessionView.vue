@@ -183,13 +183,7 @@ onMounted(() => {
   const throttledSendCursor = throttle(50, sendCursor, {
     noLeading: false,
     noTrailing: false,
-  });
-
-  socket.on("send_file", (new_file) => {
-    console.log("Received file from host.");
-    console.log(new_file);
-    if (!file.value) file.value = new Blob([new_file]);
-  });
+  })
 
   // when mouse is moved, broadcast mouse position to all connections
   // event is throttled to reduce load on connection
@@ -204,7 +198,12 @@ function handleFileInput(e: Event) {
     file.value = target.files[0];
   }
   console.log("Sending file to backend.");
-  socket.emit("send_file", file.value);
+  const fileReader = new FileReader();
+  fileReader.onload = async () => {
+    for (const conn of conns)
+      conn.send({file: fileReader.result});
+  }
+  fileReader.readAsArrayBuffer(file.value);
 }
 
 const isFile = computed(() => {
