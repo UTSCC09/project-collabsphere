@@ -1,6 +1,6 @@
 <script  setup lang="ts" type="module">
 import { useUserdataStore } from '@/stores/userdata';
-import { computed } from 'vue';
+import {computed, onBeforeUnmount} from 'vue';
 import { useRoute } from 'vue-router';
 
 const userstore = useUserdataStore()

@@ -1,5 +1,5 @@
 <script setup lang="ts" type="module">
-import { computed, onMounted, ref, Ref, Component } from "vue";
+import {computed, onMounted, ref, Ref, Component, onBeforeUnmount, onBeforeMount} from "vue";
 import { Peer } from "https://esm.sh/peerjs@1.5.4?bundle-deps"
 import { throttle } from 'throttle-debounce';
 import { io } from "socket.io-client";
@@ -57,18 +57,22 @@ interface cursor {
   y_coord: Ref<number>;
 }
 
-// opens socket connection to backend
-const socket = io(`${import.meta.env.VITE_PUBLIC_SOCKET}`, {
-  transports: ['websocket', 'polling', 'flashsocket'],
-  withCredentials: true,
-});
+let socket = null;
 
-socket.on('connect', () => {
-  console.log('Socket.IO connected with ID:', socket.id);
-});
+onBeforeMount(() => {
+  // opens socket connection to backend
+  socket = io(`${import.meta.env.VITE_PUBLIC_SOCKET}`, {
+    transports: ['websocket', 'polling', 'flashsocket'],
+    withCredentials: true,
+  });
 
-socket.on('connect_error', (err) => {
-  console.error('Socket.IO connection error:', err);
+  socket.on('connect', () => {
+    console.log('Socket.IO connected with ID:', socket.id);
+  });
+
+  socket.on('connect_error', (err) => {
+    console.error('Socket.IO connection error:', err);
+  });
 });
 
 // modified from https://stackoverflow.com/questions/30738079/webrtc-peerjs-text-chat-connect-to-multiple-peerid-at-the-same-time
@@ -166,7 +170,7 @@ onMounted(() => {
   socket.on("user_disconnection", (id) => {
     const index = conns.indexOf(otherUsers.get(id).conn);
     otherUsers.delete(id);
-    
+
     if (index !== -1) {
       conns.splice(index, 1);
 
@@ -224,6 +228,9 @@ const isFile = computed(() => {
   return file.value !== null;
 });
 
+onBeforeUnmount(() => {
+  if (socket) socket.disconnect();
+});
 </script>
 
 <template>
