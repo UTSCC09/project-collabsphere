@@ -18,14 +18,23 @@ const emits = defineEmits(["sendAnnotations"]);
 
 let viewer = null;
 
+// disabled prevents infinite loop of importing and sending annotations
+let disabled = false;
 async function sendAnnotations() {
+  if (disabled) return;
   const annotations = await viewer.exportAnnotationsAsync()
   // send the annotations to the other users
   emits("sendAnnotations", annotations);
 }
 
+async function exportAnnotations() {
+  return await viewer.exportAnnotationsAsync();
+}
+
 async function importAnnotations(annotations) {
+  disabled = true;
   await viewer.importAnnotationsAsync(annotations);
+  disabled = false;
 }
 
 const throttledSendAnnotations = throttle(100, sendAnnotations, {
@@ -49,6 +58,7 @@ onMounted(() => {
 
 defineExpose({
   importAnnotations,
+  exportAnnotations,
 });
 </script>
 
