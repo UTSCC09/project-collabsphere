@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import LoginItem from '../components/LoginItem.vue'
 import { useUserdataStore } from '@/stores/userdata';
 import { useRouter } from 'vue-router';
+import ClientAVFrame from '../components/ClientAVFrame.vue'
 const userstore = useUserdataStore()
 
 const isLoggedIn = computed(() => userstore.isLoggedIn)
@@ -59,6 +60,7 @@ function joinSession() {
 </script>
 
 <template>
+  <ClientAVFrame />
   <main v-if="!isLoggedIn">
     <h1>You need an account to enjoy CollabSphere</h1>
     <LoginItem />
