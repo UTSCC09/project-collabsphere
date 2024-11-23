@@ -1,59 +1,76 @@
+
 <!-- This is a temporary vue item to test Document reading and segmenting -->
 <!-- Accept file as prop -->
 <script setup lang="ts" type="module">
 import {onMounted} from 'vue';
-import * as pdfjsLib from "pdfjs-dist/build/pdf";
-import * as pdfjsViewer from "pdfjs-dist/web/pdf_viewer.mjs"
+// @ts-expect-error
+import { TsPdfViewer, TsPdfViewerOptions } from "ts-pdf";
+import {throttle} from "throttle-debounce";
 
 const props = defineProps({
-  file: Object
+  file: {
+    type: Blob,
+    required: true,
+  },
 });
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.mjs"
+const emits = defineEmits(["sendAnnotations"]);
 
-const PAGE_TO_VIEW = 1;
-const SCALE = 1.0;
+let viewer = null;
 
-const eventBus = new pdfjsViewer.EventBus();
+// disabled prevents infinite loop of importing and sending annotations
+let disabled = false;
+async function sendAnnotations() {
+  if (disabled) return;
+  const annotations = await viewer.exportAnnotationsAsync()
+  // send the annotations to the other users
+  emits("sendAnnotations", annotations);
+}
 
-async function getPdf() {
-  const fileReader = new FileReader();
+async function exportAnnotations() {
+  return await viewer.exportAnnotationsAsync();
+}
 
-  fileReader.onload = async () => {
-    const container = document.getElementById("pageContainer");
+async function importAnnotations(annotations) {
+  disabled = true;
+  await viewer.importAnnotationsAsync(annotations);
+  disabled = false;
+}
 
-    const loadingTask = pdfjsLib.getDocument(new Uint8Array(fileReader.result));
+const throttledSendAnnotations = throttle(100, sendAnnotations, {
+  noLeading: false,
+  noTrailing: true,
+});
 
-    const pdf = await loadingTask.promise;
-    const pdfPage = await pdf.getPage(PAGE_TO_VIEW);
-    const pdfPageView = new pdfjsViewer.PDFPageView({
-      container,
-      id: PAGE_TO_VIEW,
-      scale: SCALE,
-      defaultViewport: pdfPage.getViewport({ scale: SCALE }),
-      eventBus,
-    });
-
-    pdfPageView.setPdfPage(pdfPage);
-    pdfPageView.draw();
+async function run(): Promise<void> {
+  const options: TsPdfViewerOptions = {
+    containerSelector: "#pageContainer",
+    workerSource: "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.mjs",
+    annotChangeCallback: throttledSendAnnotations,
   };
-
-  fileReader.readAsArrayBuffer(props.file);
+  viewer = new TsPdfViewer(options);
+  await viewer.openPdfAsync(props.file);
 }
 
 onMounted(() => {
-  getPdf();
+  run();
+});
+
+defineExpose({
+  importAnnotations,
+  exportAnnotations,
 });
 </script>
 
 <template>
   <div id="pageContainer" class="pdfViewer singlePageView"></div>
-  <!--
-  <iframe src="https://mozilla.github.io/pdf.js/web/viewer.html?file=compressed.tracemonkey-pldi-09.pdf" width="100%" height="100%" frameborder="0" />
-  -->
 </template>
 
 <style>
-@import "pdfjs-dist/web/pdf_viewer.css";
-
+#pageContainer {
+  border: 1px solid #ccc !important;
+  width: 100%;
+  height: calc(87.5vh - 80px);
+  overflow-y: scroll;
+}
 </style>

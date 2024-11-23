@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import {computed} from "vue";
 
-const props = defineProps({
-  x_coord: Number,
-  y_coord: Number,
-  username: String
-});
+const props = defineProps<{
+  x_coord: number,
+  y_coord: number,
+  username: string
+}>();
 
 // from https://gist.github.com/0x263b/2bdd90886c2036a1ad5bcf06d6e6fb37
-String.prototype.toColor = function() {
+const toColor = function(value: string): string {
   const colors = ["#da4d2f", "#93220a", "#ff8b73", "#FFC300", "#f0c72f", "#dde249", "#b6e249",
                   "#7ad639", "#1ecfb2", "#0c94b2", "#312bee", "#9053d0", "#e855dd"];
 
   let hash = 0;
-  if (this.length === 0) return hash;
-  for (let i = 0; i < this.length; i++) {
-    hash = this.charCodeAt(i) + ((hash << 5) - hash);
+  if (value.length === 0) return hash.toString();
+  for (let i = 0; i < value.length; i++) {
+    hash = value.charCodeAt(i) + ((hash << 5) - hash);
     hash = hash & hash;
   }
   hash = ((hash % colors.length) + colors.length) % colors.length;
@@ -36,16 +36,16 @@ watch(() => [props.x_coord.value, props.y_coord.value], () => {
  */
 
 // calculate hex string using username
-const color = props.username.toColor();
+const color = toColor(props.username);
 
 // converts x_coord to pixel value
 const x = computed(() => {
-  return props.x_coord * window.innerWidth;
+  return (props.x_coord || 0)  * window.innerWidth;
 });
 
 // converts y_coord to pixel value
 const y = computed(() => {
-  return props.y_coord * window.innerHeight;
+  return (props.y_coord || 0) * window.innerHeight;
 });
 
 </script>
@@ -60,7 +60,7 @@ const y = computed(() => {
           target="_blank"
           >CC 3.0 BY</a
         > -->
-  <div :id="props.username" class="cursor-item absolute pointer-events-none">
+  <div :id="props.username" class="cursor-item fixed pointer-events-none">
     <svg class="cursor h-8 w-8" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
       <path
         stroke-width="0"

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useUserdataStore } from '@/stores/userdata'
+import SpinnerIcon from './SpinnerIcon.vue';
 
 const userstore = useUserdataStore()
 
@@ -9,12 +10,16 @@ const reg = new RegExp('^[ A-Za-z0-9_@./#&+!-]{8,}$')
 
 const status = ref('Sign in')
 const match_error = ref('')
+const response_error = ref('')
 const regex_error = ref('')
+const username_error = ref('')
 
 const username = ref('')
 const email = ref('')
 const password = ref('')
 const cpassword = ref('')
+
+const processing = ref(false)
 
 function validate_password() {
   if (password.value.length < 8) {
@@ -37,11 +42,20 @@ function check_password() {
   }
 }
 
+function validate_username() {
+  const usernameRegex = /^[ A-Za-z0-9_@./#&+!-]{8,20}$/;
+
+  if (usernameRegex.test(username.value)) {
+    username_error.value = ''
+  } else {
+    username_error.value = 'Username must be 8-20 characters and can only contain letters, numbers, and certain symbols.'
+  }
+}
+
 async function signin() {
   try {
-    console.log('Signing in')
-    console.log(email.value)
-    console.log(password.value)
+    response_error.value = ''
+    processing.value = true
     const response = await fetch(
       `${import.meta.env.VITE_PUBLIC_BACKEND}/api/signin`,
       {
@@ -58,7 +72,12 @@ async function signin() {
     )
 
     if (!response.ok) {
-      throw new Error(`Response status: ${response.status}`)
+      try {
+        const json = await response.json()
+        response_error.value = json.message || 'Error signing up'
+      } finally {
+        throw new Error(`Response status: ${response.status}`)
+      }
     }
     const json = await response.json()
     console.log(json)
@@ -70,6 +89,9 @@ async function signin() {
   } catch (error) {
     console.log(error)
   }
+
+  processing.value = false
+
 }
 
 async function signup() {
@@ -78,6 +100,8 @@ async function signup() {
     return
   }
   try {
+    response_error.value = ''
+    processing.value = true
     const response = await fetch(
       `${import.meta.env.VITE_PUBLIC_BACKEND}/api/signup`,
       {
@@ -88,13 +112,18 @@ async function signup() {
         body: JSON.stringify({
           username: username.value,
           email: email.value,
-          password: password.value,
+          password: password.value, 
         }),
       },
     )
 
     if (!response.ok) {
-      throw new Error(`Response status: ${response.status}`)
+      try {
+        const json = await response.json()
+        response_error.value = json.message || 'Error signing up'
+      } finally {
+        throw new Error(`Response status: ${response.status}`)
+      }
     }
     const json = await response.json()
 
@@ -106,6 +135,8 @@ async function signup() {
   } catch (error) {
     console.log(error)
   }
+
+  processing.value = false
 }
 
 const isDisabled = computed(() => {
@@ -117,11 +148,7 @@ const isDisabled = computed(() => {
   <!-- Modified from https://tailwindui.com/components/application-ui/forms/sign-in-forms -->
   <div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
     <div class="sm:mx-auto sm:w-full sm:max-w-sm">
-      <h2
-        class="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900"
-      >
-        {{ status }}
-      </h2>
+      <h2 class="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-cyan-900">{{status}}</h2>
     </div>
 
     <div
@@ -167,8 +194,10 @@ const isDisabled = computed(() => {
             />
           </div>
         </div>
+        <p id="match-error" class="text-red-400">{{response_error}}</p>
 
-        <input type="submit" class="btn" value="Sign in" />
+        <div v-if="processing" class="w-full flex items-center justify-center"><SpinnerIcon/></div>
+        <input v-else type="submit" class="btn" value="Sign in" />
       </form>
 
       <p class="mt-10 text-center text-sm text-gray-500">
@@ -183,17 +212,20 @@ const isDisabled = computed(() => {
       <form class="space-y-6" @submit.prevent="signup">
         <div>
           <label for="display" class="form-label">Display name</label>
+          
           <div class="mt-2">
             <input
               id="username"
               name="username"
+              @keyup="validate_username"
               v-model="username"
               autocomplete="username"
               placeholder="display name"
               required
               class="form-input"
-            />
-          </div>
+              />
+            </div>
+            <p id="regex-error" class="text-red-400">{{ username_error }}</p>
         </div>
 
         <div>
@@ -251,7 +283,10 @@ const isDisabled = computed(() => {
           </div>
         </div>
 
+        <p id="match-error" class="text-red-400">{{response_error}}</p>
+        <div v-if="processing" class="w-full flex items-center justify-center"><SpinnerIcon/></div>
         <input
+          v-else
           type="submit"
           class="btn"
           :disabled="isDisabled"
