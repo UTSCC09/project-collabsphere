@@ -12,6 +12,10 @@ const props = defineProps({
     type: Blob,
     required: true,
   },
+  conns: {
+    type: Object,
+    required: true,
+  }
 });
 
 const emits = defineEmits(["sendAnnotations"]);
@@ -27,8 +31,10 @@ async function sendAnnotations() {
   emits("sendAnnotations", annotations);
 }
 
-async function exportAnnotations() {
-  return await viewer.exportAnnotationsAsync();
+// sends annotations to a single connection (useful for when a new user joins)
+async function sendAnnotationsTo(connection) {
+  const annotations = await viewer.exportAnnotationsAsync();
+  connection.send({annotations: annotations});
 }
 
 async function importAnnotations(annotations) {
@@ -50,6 +56,12 @@ async function run(): Promise<void> {
   };
   viewer = new TsPdfViewer(options);
   await viewer.openPdfAsync(props.file);
+
+  // TODO change random connection to host
+  // choose a random connection and ask for the annotations
+  if (props.conns[0]) {
+    props.conns[0].send({request: "annotations"});
+  }
 }
 
 onMounted(() => {
@@ -58,7 +70,7 @@ onMounted(() => {
 
 defineExpose({
   importAnnotations,
-  exportAnnotations,
+  sendAnnotationsTo,
 });
 </script>
 

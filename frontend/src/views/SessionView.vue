@@ -89,6 +89,23 @@ function connection_init(conn: Peer) {
       return;
     }
 
+    if (data.x && data.y && otherUsers.get(conn.peer).username) {
+      // TODO use interpolation
+      x_coord.value = data.x;
+      y_coord.value = data.y;
+
+      // if no cursor for this connection exists yet, create one
+      if (!cursorIds.includes(conn.peer)) {
+        cursorIds.push(conn.peer);
+        cursors.value.push({
+          id: conn.peer,
+          username: otherUsers.get(conn.peer).username,
+          x_coord: x_coord,
+          y_coord: y_coord
+        });
+      }
+    }
+
     if (data.file) {
       file.value = new Blob([data.file]);
       return;
@@ -99,22 +116,9 @@ function connection_init(conn: Peer) {
       return;
     }
 
-    // check if username has not been received, or data is not x or y coordinates
-    if (!data.x || !data.y || !otherUsers.get(conn.peer).username) return;
-
-    // TODO use interpolation
-    x_coord.value = data.x;
-    y_coord.value = data.y;
-
-    // if no cursor for this connection exists yet, create one
-    if (!cursorIds.includes(conn.peer)) {
-      cursorIds.push(conn.peer);
-      cursors.value.push({
-        id: conn.peer,
-        username: otherUsers.get(conn.peer).username,
-        x_coord: x_coord,
-        y_coord: y_coord
-      });
+    if (data.request && data.request === "annotations") {
+      documentReaderRef.value.sendAnnotationsTo(conn);
+      return;
     }
   });
 
@@ -245,7 +249,7 @@ onBeforeUnmount(() => {
           </Teleport>
         </div>
         <div v-if="isFile" id="viewer">
-          <DocumentReader v-if="file" :file="file" ref="documentReaderRef" @sendAnnotations="sendAnnotations"/>
+          <DocumentReader v-if="file" :file="file" :conns="conns" ref="documentReaderRef" @sendAnnotations="sendAnnotations"/>
         </div>
       </div>
       <div id="side-items" class="basis-1/3 ml-5">
