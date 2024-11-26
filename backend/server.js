@@ -29,15 +29,14 @@ const config = {
   key: privateKey,
   cert: certificate
 };
-
-const customGenerationFunction = () =>
-  (Math.random().toString(36) + "0000000000000000000").substring(2, 16);
+ 
+const customGenerationFunction = () => (Math.random().toString(36) + "0000000000000000000").substring(2, 16);
 
 app.use(function (req, res, next) {
-  res.header("Access-Control-Allow-Origin", process.env.FRONTEND);
-  res.header("Access-Control-Allow-Headers", "Content-Type");
-  res.header("Access-Control-Allow-Methods", "*");
-  next();
+	res.header("Access-Control-Allow-Origin", process.env.FRONTEND);
+	res.header("Access-Control-Allow-Headers", "Content-Type");
+	res.header("Access-Control-Allow-Methods", "*");
+	next();
 });
 
 // * Primary server
@@ -47,51 +46,34 @@ const server = createServer(config, app);
 const httpsSocketServer = createServer(config, app);
 
 const io = new Server(httpsSocketServer, {
-  cors: {
-    origin: process.env.FRONTEND,
-    methods: ["GET", "POST"],
-    credentials: true,
-  }
+	cors: {
+		origin: process.env.FRONTEND,
+		methods: ["GET", "POST"],
+		credentials: true,
+	},
 });
 
 httpsSocketServer.listen(3030);
 
 // const pServer = app.listen(1234);
 const peerServer = ExpressPeerServer(server, {
-  // debug: true,
-  // proxied: true,
-  allow_discovery: true,
-  path: "/app",
-  port: 4000,
-  // ssl: {
-  //   key: config.key,
-  //   cert: config.cert
-  // },
-  sslkey: '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem',
-  sslcert: '/etc/letsencrypt/live/collabsphere.xyz/cert.pem',
-  generateClientId: customGenerationFunction,
+	// debug: true,
+	// proxied: true,
+	allow_discovery: true,
+	path: "/app",
+	port: 4000,
+	// ssl: {
+	//   key: config.key,
+	//   cert: config.cert
+	// },
+	sslkey: `C:/Users/talba/Documents/Miscellaneous Shared/GitHub/project-collabsphere/ssl/privkey.pem`,
+	sslcert: `C:/Users/talba/Documents/Miscellaneous Shared/GitHub/project-collabsphere/ssl/cert.pem`,
+
+	// sslkey: '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem',
+	// sslcert: '/etc/letsencrypt/live/collabsphere.xyz/cert.pem',
+	generateClientId: customGenerationFunction,
 });
 
-// const pServer = app.listen(1234);
-// const peerServer = ExpressPeerServer(pServer, {
-//   // debug: true,
-//   // proxied: true,
-//   allow_discovery: true,
-//   path: "/app",
-//   port: 1234,
-//   // ssl: {
-//   //   key: config.key,
-//   //   cert: config.cert
-//   // },
-//   corsOptions: {
-//     origin: process.env.FRONTEND,
-//     methods: ["GET", "POST"],
-//     credentials: true,
-//   },
-//   sslkey: '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem',
-//   sslcert: '/etc/letsencrypt/live/collabsphere.xyz/cert.pem',
-//   generateClientId: customGenerationFunction,
-// });
 
 app.use(peerServer);
 

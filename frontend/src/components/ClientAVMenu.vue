@@ -5,19 +5,25 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 // HiSolidDotsHorizontal
+
+const props = defineProps<{
+  class?: string;
+}>();
+
+
 </script>
 
 <template>
   <Popover>
-    <PopoverTrigger class="float-right">
+    <PopoverTrigger  :class="[props.class, 'float-right']">
       <v-icon name="hi-solid-dots-horizontal"/>
     </PopoverTrigger>
     <PopoverContent class="bg-zinc-900 border-gray-500 text-white">
         <h1 class="font-semibold">Menu</h1>
         <ul class="text-sm">
-            <li>Server Mute</li>
-            <li>Allow Video</li>
-            <li class="text-red-500">Kick</li>
+            <li><button>Server Mute</button></li>
+            <li><button>Allow Video</button></li>
+            <li class="text-red-500"><button>Kick</button></li>
         </ul>
     </PopoverContent>
   </Popover>
