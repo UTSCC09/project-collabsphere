@@ -2,12 +2,13 @@
 import {computed, onMounted, ref, Ref, Component, onBeforeUnmount, onBeforeMount} from "vue";
 import { Peer } from "https://esm.sh/peerjs@1.5.4?bundle-deps"
 import { throttle } from 'throttle-debounce';
-import { io } from "socket.io-client";
+import { io, Socket } from "socket.io-client";
 import CursorItem from "@/components/CursorItem.vue";
 import DocumentReader from "@/components/DocumentReader.vue";
 import { useUserdataStore } from "@/stores/userdata";
 import SharedNote from "@/components/SharedNote.vue";
 import ClientAVFrame from '../components/ClientAVFrame.vue'
+import * as mediasoup from "mediasoup-client";
 
 // true if user is host
 const isHost = computed(() => {
@@ -58,9 +59,10 @@ interface cursor {
   y_coord: Ref<number>;
 }
 
-let socket = null;
+let socket: Socket | null = null;
 
 onBeforeMount(() => {
+  
   // opens socket connection to backend
   socket = io(`${import.meta.env.VITE_PUBLIC_SOCKET}`, {
     transports: ['websocket', 'polling', 'flashsocket'],
@@ -155,6 +157,8 @@ onMounted(() => {
       otherUsers.set(conn.peer, {conn: conn});
       // send your username to the other user
       conn.send({username: username.value});
+      
+      
 
       // send file if it exists and current user is the host
       if (file.value && isHost) {
@@ -184,6 +188,16 @@ onMounted(() => {
     }
 
     removeClientStream(id);
+  });
+
+  socket.on("add_stream", ({id, stream}: {id: string, stream: MediaStream}) => {
+    console.log("Adding stream to video element.");
+    addClientStream({
+      username: id,
+      audio: true,
+      video: true,
+      stream: stream,
+    });
   });
 
   // when mouse is moved, broadcast mouse position to all connections
@@ -237,13 +251,13 @@ onBeforeUnmount(() => {
 
 
 function addClientStream(data: ClientStreamData) {
-  clientConfigData.push(data);
+  clientConfigData.value.push(data);
 }
 
 function removeClientStream(id: string) {
-  const index = clientConfigData.findIndex((data) => data.id === id);
+  const index = clientConfigData.value.findIndex((data) => data.id === id);
   if (index !== -1) {
-    clientConfigData.splice(index, 1);
+    clientConfigData.value.splice(index, 1);
   }
 }
 
@@ -256,56 +270,193 @@ interface ClientStreamData {
   stream: MediaStream;
 }
 
-const clientConfigData: ClientStreamData[] = [];
+
+const clientConfigData: Ref<ClientStreamData[]> = ref([]);
+// const video: Ref<HTMLVideoElement | null> = ref(null);
 
 async function sourceSelected(audioSource: string, videoSource: string) {
     const constraints = {
         audio: { deviceId: audioSource },
-        video: { deviceId: videoSource, 
-            width: { min: 160, ideal: 270, max: 640 },
-            height: { min: 240, ideal: 480, max: 480 }  }, };
+        video: { deviceId: videoSource, },};
+            // width: { min: 160, ideal: 270, max: 1280 },
+            // height: { min: 240, ideal: 480, max: 720 }  }, };
+
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
-    if (video && video.value) {
-        console.log("Setting stream to video element");
-        video.value.srcObject = stream;
+    console.log("Setting stream to video element");
 
-        socket.emit("add_stream", stream);
+    addClientStream({
+        username: username.value,
+        audio: true,
+        video: true,
+        stream: stream,
+    });
+    // socket.emit("add_stream", stream);
+
+}
+let device: mediasoup.types.Device, producerTransport, consumerTransport, producers = {};
+
+async function bindConsumer(producerId) {
+  console.log("Binding consumer", producerId);
+  
+  socket?.emit("consume", producerId, async ({ rtpCapabilities, consumerParameters }) => {
+    console.log("Consuming", producerId);
+    if (consumerTransport === null) {
+      console.error("Cannot consume before initializing consumer transport");
+      return;
     }
+    const consumer = await consumerTransport.consume({ id: producerId, producerId, kind });
+    const stream = new MediaStream();
+    stream.addTrack(consumer.track);
+
+    addClientStream({
+      username: producerId,
+      audio: kind === "audio",
+      video: kind === "video",
+      stream: stream,
+    });
+  });
 }
 
-const localStream = ref<MediaStream | null>(null);
+async function initializeStreams(hasMedia=true) {
+  let stream: MediaStream;
+  if (hasMedia) { 
+    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  }
 
-async function loadMyStream() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        const devices = await navigator.mediaDevices.enumerateDevices();
+  console.log("Initializing streams");
 
-        let audioSource: string | null = null;
-        let videoSource: string | null = null;
+  async function handle_join_stream_room({routerRtpCapabilities, producerIds}) {
+    console.log("JOINING STREAM ROOM");
+    device = new mediasoup.Device();
+    await device.load({routerRtpCapabilities});
 
 
-        devices.forEach((device) => {
-            if (device.kind === "audioinput") {
-                audioSource = device.deviceId;
-            } else if (device.kind === "videoinput") {
-                videoSource = device.deviceId;
-            }
+    async function handle_create_transport(params: mediasoup.types.TransportOptions<mediasoup.types.AppData>) {
+      producerTransport = device.createSendTransport({
+        ...params
+      });
+
+      // Check that producer transport is valid
+      if (!producerTransport) {
+        console.error("Producer transport is invalid");
+        return;
+      }
+
+      console.log(producerTransport)
+
+      producerTransport.on("connect", async ({ dtlsParameters }, callback) => {
+        console.log("Producer transport connected");
+        socket?.emit("connect_transport", { dtlsParameters }, callback);
+      });
+
+      if (hasMedia) {
+        console.log("Binding produce function on valid stream");
+
+        producerTransport.on("produce", async ({ kind, rtpParameters }, callback) => {
+          console.log("Time to produce.");
+          // Print out codecs
+          console.log(rtpParameters.codecs);
+          socket?.emit("produce", { kind, rtpParameters }, callback);
         });
 
-        sourceSelected(audioSource, videoSource);
-    } catch (err) {
-        if (err.name === "NotFoundError") {
-            console.log("No media devices found.");
-        } else {
-            console.error(`${err.name}: ${err.message}`);
+        for (const track of stream.getTracks()) {
+          console.log("Producing track");
+          await producerTransport.produce({ track });
         }
-        alert("navigator.mediaDevices.getUserMedia() is not supported or an error occurred.");
+      }
     }
+
+    async function handle_create_transport_after_producer(params, producerId, kind) {
+      console.log("Creating consumer transport");
+      consumerTransport = device.createRecvTransport(params);
+
+      consumerTransport.on("connect", async ({ dtlsParameters }, callback) => {
+        socket?.emit("connect_transport", { dtlsParameters }, callback);
+      });
+
+      consumerTransport.on("produce", async ({ kind, rtpParameters }, callback) => {
+        socket?.emit("produce", { kind, rtpParameters }, callback);
+      });
+
+      const consumer = await consumerTransport.consume({ producerId, kind });
+      const stream = new MediaStream();
+      stream.addTrack(consumer.track);
+
+      addClientStream({
+        username: producerId,
+        audio: kind === "audio",
+        video: kind === "video",
+        stream: stream,
+      });
+    }
+
+    async function handle_new_producer({producerId, kind}) {
+      console.log("NEW PRODUCER:", producerId, kind);
+
+      if (!device.canProduce(kind)) {
+        console.log("Cannot produce", kind);
+        return;
+      }
+
+      socket?.emit("create_transport", async (params) => 
+        handle_create_transport_after_producer(params, producerId, kind));
+    }
+
+    // Create producer transport
+    socket?.emit("create_transport", handle_create_transport);
+
+    // When a new producer is added, bind a consumer
+    socket?.on("new_producer", handle_new_producer)
+
+    console.log("Received producerIds", producerIds);
+    // Bind consumers for all existing producers
+    for (const producerId of producerIds) {
+      console.log("Binding Consumer")
+      await bindConsumer(producerId);
+    }
+  };
+  
+  socket?.emit("join_stream_room", handle_join_stream_room);
+}
+
+async function loadMyStream() {
+  let hasMedia = true;
+  try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const devices = await navigator.mediaDevices.enumerateDevices();
+
+      let audioSource: string | null = null;
+      let videoSource: string | null = null;
+
+      devices.forEach((device) => {
+          if (device.kind === "audioinput") {
+              audioSource = device.deviceId;
+          } else if (device.kind === "videoinput") {
+              videoSource = device.deviceId;
+          }
+      });
+
+      sourceSelected(audioSource, videoSource);
+
+  } catch (err) {
+      if (err.name === "NotFoundError") {
+          console.log("No media devices found.");
+      } else {
+          console.error(`${err.name}: ${err.message}`);
+      }
+      hasMedia = false;
+      // alert("navigator.mediaDevices.getUserMedia() is not supported or an error occurred.");
+  } finally {
+    
+    initializeStreams(hasMedia);
+  }
 }
 
 onMounted(() => {
+
   loadMyStream();
+
 });
 
 </script>

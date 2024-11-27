@@ -79,6 +79,7 @@ const peerServer = ExpressPeerServer(server, {
 
 app.use(peerServer);
 
+
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
@@ -110,52 +111,147 @@ if (process.env.NODE_ENV !== 'test') {
 
 }
 
-import {createWorker, ms_router} from './mediasoup-setup.js';
+import {createWorker, ms_router, ms_worker, ms_routerOptions} from './mediasoup-setup.js';
 
 (async () => {
   await createWorker();
 })();
 
-io.on("connection", (socket) => {
-  
-  socket.on("join_session", async (sessionId, id) => {
-    console.log("Received join request from", id);
-    socket.join(sessionId);
-  
-    
-    // Create a transport for the client
-    // const transport = await createWebRtcTransport(ms_router);
-    // callback({ transportOptions: transport });
-    
-    
-    socket.to(sessionId).emit("user_connection", id);
-    
-    socket.on("add_stream", (stream) => {
-      console.log("Received Stream Request by", id);
-      socket.to(sessionId).emit("add_stream", {id, stream});
-    });
-    
-    socket.on('note', (note) => {
-      socket.to(sessionId).emit('note', note);
-    });
+const rooms = new Map();
 
-    socket.on("disconnect", () => {
-      socket.to(sessionId).emit("user_disconnection", id);
-      socket.leave(sessionId);
-    });
+const get_room = (sessionId) => {
+  return rooms.get(sessionId) || { transports: [], producers: [], consumers: [] };
+}
+
+io.on("connection", (socket) => {
+	socket.on("join_session", async (sessionId, id) => {
+
+		console.log("Received join request from", id);
+		socket.join(sessionId);
+
+		socket.to(sessionId).emit("user_connection", id);
+
+
+		socket.on("note", (note) => {
+			socket.to(sessionId).emit("note", note);
+		});
+
+		socket.on("disconnect", () => {
+      console.log("Client Disconnected:", id);
+
+      delete rooms[socket.id];
+
+			socket.to(sessionId).emit("user_disconnection", id);
+			socket.leave(sessionId);
+		});
+
+		/* Media Soup */
+    bind_mediasoup(socket, sessionId, id);
+
   });
 });
 
 
+const bind_mediasoup = (socket, sessionId, id) => {
+
+  socket.on("join_stream_room", async (callback) => {
+    // Create a Router for the room if it doesn't exist
+    if (!ms_router[sessionId]) {
+      ms_router[sessionId] = await ms_worker.createRouter({ mediaCodecs: ms_routerOptions.mediaCodecs });
+    }
+
+    const room = get_room(sessionId);
+    rooms.set(sessionId, room);
+
+    const producerIds = room.producers.map((producer) => producer.id);
+
+    callback({ 
+      routerRtpCapabilities: ms_router[sessionId].rtpCapabilities,
+      producerIds 
+    });
+  });
+
+
+  /* Media Soup Internal */
+  socket.on("create_transport", async (callback) => {
+    const transport = await createWebRtcTransport(ms_router);
+    callback({
+      id: transport.id,
+      iceParameters: transport.iceParameters,
+      iceCandidates: transport.iceCandidates,
+      dtlsParameters: transport.dtlsParameters,
+    });
+ 
+    socket.on("connect_transport", async ({dtlsParameters}, callback) => {
+      console.log(dtlsParameters.fingerprints)
+      console.log("Transport connected");
+      await transport.connect({ dtlsParameters });
+      callback();
+    });  
+
+    socket.on("produce", async ({kind, rtpParameters}, callback) => {
+      console.log("Producer requested");
+
+      const room = get_room(sessionId);
+      
+      // Print codecs
+      console.log("codecs", rtpParameters.codecs);
+
+      const producer = await transport.produce({ kind, rtpParameters });
+
+      
+      room.producers.push(producer);
+      rooms.set(sessionId, room);
+      
+      socket.to(sessionId).emit("new_producer", { producerId: producer.id, kind });
+
+      console.log("Producer created");
+      callback({ id: producer.id });
+    })
+
+    socket.on("consume", async ({ producerId, rtpCapabilities }, callback) => {
+
+      console.log("Consumer requested");
+      const router = routers[sessionId];
+      const transport = rooms[socket.id].transports.find((t) => t.appData?.consumer);
+
+      if (!router.canConsume({producerId, rtpCapabilities})) {
+        return callback({error: 'Cannot consume'});
+      }
+
+      const consumer = await transport.consume({
+        producerId,
+        rtpCapabilities: consumerParameters.rtpCapabilities,
+        paused: false,
+      });
+      
+      const rooms = get_room(sessionId);
+      rooms.consumers.push(consumer);
+      rooms.set(sessionId, rooms);
+
+      callback({ 
+        consumerId: consumer.id, 
+        producerId,
+        kind: consumer.kind,
+        params: consumer.rtpParameters });
+    });
+
+  });
+}
+
+
 const createWebRtcTransport = async (router) => {
+
+  // Print valid codecs
+  console.log(router.rtpCapabilities.codecs);
+  console.log(router)
+
   const transport = await router.createWebRtcTransport({
-    listenIps: [{ ip: '0.0.0.0', announcedIp: '192.168.0.1' }],
+    listenIps: [{ ip: '127.0.0.1', announcedIp: null }], // 127.0.0.1 incompatible with Firefox
     enableUdp: true,
     enableTcp: true,
     preferUdp: true,
   });
-
-  console.log(transport)
 
 
   transport.on('dtlsstatechange', dtlsState => {
@@ -163,7 +259,6 @@ const createWebRtcTransport = async (router) => {
       transport.close();
     }
   });
-
 
   transport.on('close', () => {
     console.log('Transport closed');

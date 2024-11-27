@@ -5,7 +5,7 @@ import ClientAVMenu from './ClientAVMenu.vue'
 import { useUserdataStore } from '@/stores/userdata';
 
 const userdata = useUserdataStore();
-
+console.log("CREATED");
 
 const isMuted = ref(false)
 const isVideoOff = ref(false)
@@ -24,7 +24,6 @@ const props = defineProps<{
 const isMyself = computed(() => {
     return userdata.username === props.data.username
 })
-const video: Ref<HTMLVideoElement | null> = ref(null)
 
 function toggleMute() {
     isMuted.value = !isMuted.value
@@ -66,13 +65,14 @@ onMounted(async () => {
     }
 })
 
+
 </script>
 
 <template>
     <div class="bg-black w-64 text-white rounded-md overflow-clip relative" >
         <ClientAVMenu class="absolute z-[100] top-2 right-2"/>
         <div class="w-64 h-44 top-0 relative">
-            <video ref="props.data.stream" class="w-full h-full top-0 absolute left-0 rounded-lg scale-110 " autoplay></video>
+            <video :srcObject="props.data.stream" class="w-full h-full top-0 absolute left-0 rounded-lg scale-110 " autoplay></video>
         </div>
         <h3 class="font-semibold absolute top-2 left-2   bg-black/50 backdrop -blur-sm px-2" v-text="props.data.username" ></h3 class="font-semibold">
         <div class="flex items-center justify-center gap-2 relative z-[100] bg-black p-2" v-if="isMyself && video && video.value">
