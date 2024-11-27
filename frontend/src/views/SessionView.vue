@@ -7,6 +7,7 @@ import CursorItem from "@/components/CursorItem.vue";
 import DocumentReader from "@/components/DocumentReader.vue";
 import { useUserdataStore } from "@/stores/userdata";
 import SharedNote from "@/components/SharedNote.vue";
+import ClientAVFrame from '../components/ClientAVFrame.vue'
 
 // true if user is host
 const isHost = computed(() => {
@@ -181,6 +182,8 @@ onMounted(() => {
         }
       }
     }
+
+    removeClientStream(id);
   });
 
   // when mouse is moved, broadcast mouse position to all connections
@@ -231,33 +234,114 @@ const isFile = computed(() => {
 onBeforeUnmount(() => {
   if (socket) socket.disconnect();
 });
+
+
+function addClientStream(data: ClientStreamData) {
+  clientConfigData.push(data);
+}
+
+function removeClientStream(id: string) {
+  const index = clientConfigData.findIndex((data) => data.id === id);
+  if (index !== -1) {
+    clientConfigData.splice(index, 1);
+  }
+}
+
+
+interface ClientStreamData {
+  id?: string;
+  username: string;
+  audio: boolean;
+  video: boolean;
+  stream: MediaStream;
+}
+
+const clientConfigData: ClientStreamData[] = [];
+
+async function sourceSelected(audioSource: string, videoSource: string) {
+    const constraints = {
+        audio: { deviceId: audioSource },
+        video: { deviceId: videoSource, 
+            width: { min: 160, ideal: 270, max: 640 },
+            height: { min: 240, ideal: 480, max: 480 }  }, };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+    if (video && video.value) {
+        console.log("Setting stream to video element");
+        video.value.srcObject = stream;
+
+        socket.emit("add_stream", stream);
+    }
+}
+
+const localStream = ref<MediaStream | null>(null);
+
+async function loadMyStream() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+
+        let audioSource: string | null = null;
+        let videoSource: string | null = null;
+
+
+        devices.forEach((device) => {
+            if (device.kind === "audioinput") {
+                audioSource = device.deviceId;
+            } else if (device.kind === "videoinput") {
+                videoSource = device.deviceId;
+            }
+        });
+
+        sourceSelected(audioSource, videoSource);
+    } catch (err) {
+        if (err.name === "NotFoundError") {
+            console.log("No media devices found.");
+        } else {
+            console.error(`${err.name}: ${err.message}`);
+        }
+        alert("navigator.mediaDevices.getUserMedia() is not supported or an error occurred.");
+    }
+}
+
+onMounted(() => {
+  loadMyStream();
+});
+
 </script>
 
 <template>
   <div>
+    <h1 class="ml-2"><v-icon name='fa-users' class="scale-105"/> <span v-text="clientConfigData.length"/> Connected </h1>
     <CursorItem v-for="cursor in cursors" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" style="z-index:100"/>
     <hr class="my-3" />
-    <div class="flex flex-row m-5">
-      <div id="main-item" class="basis-2/3">
-        <div v-if="mounted">
-          <Teleport :disabled="!isFile" to="#top-side-item">
-            <p>MAIN</p>
-          </Teleport>
+    <div class="flex">
+      <div class="flex-1 flex flex-row m-5">
+        <div id="main-item" class="basis-2/3">
+          <div v-if="mounted">
+            <Teleport :disabled="!isFile" to="#top-side-item">
+              <p>MAIN</p>
+            </Teleport>
+          </div>
+          <div v-if="isFile" id="viewer">
+            <DocumentReader v-if="file" :file="file" ref="documentReaderRef" @sendAnnotations="sendAnnotations"/>
+          </div>
         </div>
-        <div v-if="isFile" id="viewer">
-          <DocumentReader v-if="file" :file="file" ref="documentReaderRef" @sendAnnotations="sendAnnotations"/>
+        <div id="side-items" class="basis-1/3 ml-5">
+          <div id="top-side-item" class="justify-self-center">
+            <label id="pdf-input" v-if="isHost && !isFile" class="a-href underline font-extrabold text-xl">
+              <input type="file" @input="handleFileInput" name="upload" accept="application/pdf" class="hidden" />
+              Upload PDF
+            </label>
+          </div>
+          <div id="bottom-side-item" class="min-h-[50vh] flex flex-col">
+            <SharedNote :socket="socket"/>
+          </div>
         </div>
       </div>
-      <div id="side-items" class="basis-1/3 ml-5">
-        <div id="top-side-item" class="justify-self-center">
-          <label id="pdf-input" v-if="isHost && !isFile" class="a-href underline font-extrabold text-xl">
-            <input type="file" @input="handleFileInput" name="upload" accept="application/pdf" class="hidden" />
-            Upload PDF
-          </label>
-        </div>
-        <div id="bottom-side-item" class="min-h-[50vh] flex flex-col">
-          <SharedNote :socket="socket"/>
-        </div>
+      <div class="flex flex-col gap-2 w-fit bg-slate-300 overflow-scroll h-[85vh]">
+          <!-- For looop  -->
+        <ClientAVFrame v-for="(data, index) in clientConfigData" :key="index" :data="data" :socket="socket"/>
       </div>
     </div>
   </div>

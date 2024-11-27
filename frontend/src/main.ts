@@ -29,6 +29,7 @@ import {
   BiCameraVideoOffFill,
   BiCameraVideoFill,
   HiSolidDotsHorizontal,
+  FaUsers
 } from 'oh-vue-icons/icons'
 
 addIcons(
@@ -43,6 +44,7 @@ addIcons(
   BiCameraVideoOffFill,
   BiCameraVideoFill,
   HiSolidDotsHorizontal,
+  FaUsers
 )
 
 const app = createApp(App)

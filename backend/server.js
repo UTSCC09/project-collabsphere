@@ -9,6 +9,8 @@ import cors from 'cors';
 import { readFileSync } from "fs";
 import { createServer } from "https";
 import cookieParser from 'cookie-parser';
+import mediasoup from 'mediasoup';
+
 dotenv.config();
 
 const app = express();
@@ -108,13 +110,31 @@ if (process.env.NODE_ENV !== 'test') {
 
 }
 
-io.on("connection", (socket) => {
-  console.log("Connection Request");
-  socket.on("join_session", (sessionId, id) => {
-    console.log("Received join request from " + id);
-    socket.join(sessionId);
-    socket.to(sessionId).emit("user_connection", id);
+import {createWorker, ms_router} from './mediasoup-setup.js';
 
+(async () => {
+  await createWorker();
+})();
+
+io.on("connection", (socket) => {
+  
+  socket.on("join_session", async (sessionId, id) => {
+    console.log("Received join request from", id);
+    socket.join(sessionId);
+  
+    
+    // Create a transport for the client
+    // const transport = await createWebRtcTransport(ms_router);
+    // callback({ transportOptions: transport });
+    
+    
+    socket.to(sessionId).emit("user_connection", id);
+    
+    socket.on("add_stream", (stream) => {
+      console.log("Received Stream Request by", id);
+      socket.to(sessionId).emit("add_stream", {id, stream});
+    });
+    
     socket.on('note', (note) => {
       socket.to(sessionId).emit('note', note);
     });
@@ -125,6 +145,32 @@ io.on("connection", (socket) => {
     });
   });
 });
+
+
+const createWebRtcTransport = async (router) => {
+  const transport = await router.createWebRtcTransport({
+    listenIps: [{ ip: '0.0.0.0', announcedIp: '192.168.0.1' }],
+    enableUdp: true,
+    enableTcp: true,
+    preferUdp: true,
+  });
+
+  console.log(transport)
+
+
+  transport.on('dtlsstatechange', dtlsState => {
+    if (dtlsState === 'closed') {
+      transport.close();
+    }
+  });
+
+
+  transport.on('close', () => {
+    console.log('Transport closed');
+  });
+
+  return transport;
+};
 
 // server.listen(3030);
 // export the app for testing
