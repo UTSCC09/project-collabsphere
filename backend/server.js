@@ -194,16 +194,15 @@ const bind_mediasoup = (socket, sessionId, id) => {
 
       const room = get_room(sessionId);
       
-      // Print codecs
-      console.log("codecs", rtpParameters.codecs);
-
       const producer = await transport.produce({ kind, rtpParameters });
 
       
       room.producers.push(producer);
       rooms.set(sessionId, room);
       
-      socket.to(sessionId).emit("new_producer", { producerId: producer.id, kind });
+      socket.to(sessionId).emit("new_producer", { 
+        params: producer.rtpParameters,
+        producerId: producer.id, kind });
 
       console.log("Producer created");
       callback({ id: producer.id });
@@ -212,28 +211,40 @@ const bind_mediasoup = (socket, sessionId, id) => {
     socket.on("consume", async ({ producerId, rtpCapabilities }, callback) => {
 
       console.log("Consumer requested");
-      const router = routers[sessionId];
-      const transport = rooms[socket.id].transports.find((t) => t.appData?.consumer);
-
+      const router = ms_router; //[sessionId];
+      console.log(router);
+      // const transport = rooms[socket.id].transports.find((t) => t.appData?.consumer);
+      console.log("RTP Capabilities", rtpCapabilities)
+      
       if (!router.canConsume({producerId, rtpCapabilities})) {
+        console.log("Cannot Consume");
         return callback({error: 'Cannot consume'});
       }
 
       const consumer = await transport.consume({
         producerId,
-        rtpCapabilities: consumerParameters.rtpCapabilities,
+        rtpCapabilities,
         paused: false,
       });
       
-      const rooms = get_room(sessionId);
-      rooms.consumers.push(consumer);
-      rooms.set(sessionId, rooms);
+      const room = get_room(sessionId);
+      room.consumers.push(consumer);
+      rooms.set(sessionId, room);
 
+      
       callback({ 
+        id: consumer.id,
         consumerId: consumer.id, 
         producerId,
         kind: consumer.kind,
-        params: consumer.rtpParameters });
+        params: consumer.rtpParameters,
+        iceParameters: transport.iceParameters,
+        iceCandidates: transport.iceCandidates,
+        dtlsParameters: transport.dtlsParameters,
+        rtpParameters: consumer.rtpParameters,
+        
+      
+      });
     });
 
   });
@@ -241,11 +252,6 @@ const bind_mediasoup = (socket, sessionId, id) => {
 
 
 const createWebRtcTransport = async (router) => {
-
-  // Print valid codecs
-  console.log(router.rtpCapabilities.codecs);
-  console.log(router)
-
   const transport = await router.createWebRtcTransport({
     listenIps: [{ ip: '127.0.0.1', announcedIp: null }], // 127.0.0.1 incompatible with Firefox
     enableUdp: true,

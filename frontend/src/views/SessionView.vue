@@ -298,17 +298,40 @@ let device: mediasoup.types.Device, producerTransport, consumerTransport, produc
 
 async function bindConsumer(producerId) {
   console.log("Binding consumer", producerId);
-  
-  socket?.emit("consume", producerId, async ({ rtpCapabilities, consumerParameters }) => {
-    console.log("Consuming", producerId);
-    if (consumerTransport === null) {
-      console.error("Cannot consume before initializing consumer transport");
+  console.log("--> Creating consumer transport");
+
+  socket?.emit("consume", { producerId, rtpCapabilities: device.rtpCapabilities }, async (consumerOptions) => {
+    console.log("Consuming");
+
+    console.log(consumerOptions)
+    const {error} = consumerOptions;
+
+    if (error) {
+      console.error("Error consuming", error);
       return;
     }
-    const consumer = await consumerTransport.consume({ id: producerId, producerId, kind });
+    
+    const consumerTransport = device.createRecvTransport({...consumerOptions, ...consumerOptions.params});
+
+    consumerTransport.on("connect", async ({ dtlsParameters }, callback) => {
+      console.log("Bind consumer transport connected");
+      socket?.emit("connect_transport", { dtlsParameters }, callback);
+    });
+    const kind = consumerOptions.kind;
+    const conTranProps = {
+      id: consumerOptions.id,
+      kind,
+      producerId,
+      rtpCapabilities: device.rtpCapabilities,
+      rtpParameters: consumerOptions.rtpParameters,
+    }
+    console.log("Consuming with properties", conTranProps);
+    const consumer = await consumerTransport.consume(conTranProps);
+    // const consumer = await consumerTransport.consume({ producerId, kind });
     const stream = new MediaStream();
     stream.addTrack(consumer.track);
 
+    console.log("Adding client stream");
     addClientStream({
       username: producerId,
       audio: kind === "audio",
@@ -355,8 +378,6 @@ async function initializeStreams(hasMedia=true) {
 
         producerTransport.on("produce", async ({ kind, rtpParameters }, callback) => {
           console.log("Time to produce.");
-          // Print out codecs
-          console.log(rtpParameters.codecs);
           socket?.emit("produce", { kind, rtpParameters }, callback);
         });
 
@@ -367,28 +388,29 @@ async function initializeStreams(hasMedia=true) {
       }
     }
 
-    async function handle_create_transport_after_producer(params, producerId, kind) {
+    async function handle_create_transport_after_producer({params, producerId, kind}) {
       console.log("Creating consumer transport");
+      console.log(params)
       consumerTransport = device.createRecvTransport(params);
 
       consumerTransport.on("connect", async ({ dtlsParameters }, callback) => {
         socket?.emit("connect_transport", { dtlsParameters }, callback);
       });
 
-      consumerTransport.on("produce", async ({ kind, rtpParameters }, callback) => {
-        socket?.emit("produce", { kind, rtpParameters }, callback);
-      });
+      socket?.emit("consume", {producerId, rtpCapabilities: device.rtpCapabilities}, async (params) => {
+        console.log("On Skibidi Bop");
+        const consumer = await consumerTransport.consume(params);
+        const stream = new MediaStream();
+        stream.addTrack(consumer.track);
+  
+        addClientStream({
+          username: producerId,
+          audio: kind === "audio",
+          video: kind === "video",
+          stream: stream,
+        });
+      })
 
-      const consumer = await consumerTransport.consume({ producerId, kind });
-      const stream = new MediaStream();
-      stream.addTrack(consumer.track);
-
-      addClientStream({
-        username: producerId,
-        audio: kind === "audio",
-        video: kind === "video",
-        stream: stream,
-      });
     }
 
     async function handle_new_producer({producerId, kind}) {
