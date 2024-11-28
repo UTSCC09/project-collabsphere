@@ -5,7 +5,6 @@ import ClientAVMenu from './ClientAVMenu.vue'
 import { useUserdataStore } from '@/stores/userdata';
 
 const userdata = useUserdataStore();
-console.log("CREATED");
 
 const isMuted = ref(false)
 const isVideoOff = ref(false)

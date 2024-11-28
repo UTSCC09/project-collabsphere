@@ -335,8 +335,7 @@ const createRecvTransport = async (device: mediasoup.types.Device, consumerOptio
     params = data;
   }
 
-  console.log("++ Creating consumer transport");
-
+  
   const newRecvTransport = device.createRecvTransport({...params});
   newRecvTransport.on("connect", async ({ dtlsParameters }, callback) => {
     console.log("Bind consumer transport connected");
@@ -344,8 +343,9 @@ const createRecvTransport = async (device: mediasoup.types.Device, consumerOptio
     console.log(newRecvTransport.id);
     socket?.emit("connect_transport", { transportId: newRecvTransport.id, dtlsParameters }, callback);
   });
-
+  
   consumerTransport.value = newRecvTransport;
+  console.log(`++ Creating consumer (id=${newRecvTransport.id}) transport`);
   return newRecvTransport;
 }
 
@@ -356,20 +356,21 @@ const createSendTransport = async (device: mediasoup.types.Device, params=null) 
     console.error("Producer options are null");
     return;
   }
-  console.log("++ Creating producer transport");
-
+  
   const newSendTransport = device.createSendTransport({...params});
   newSendTransport.on("connect", async ({ dtlsParameters }, callback) => {
     console.log("Bind producer transport connected");
     socket?.emit("connect_transport", { transportId: newSendTransport.id,
-       dtlsParameters }, callback);
-  });
-
-  newSendTransport.on("produce", async ({ kind, rtpParameters }, callback) => {
-    console.log("Time to produce.");
-    socket?.emit("produce", { transportId: newSendTransport.id, kind, rtpParameters }, callback);
-  });
-  producerTransport.value = newSendTransport;
+      dtlsParameters }, callback);
+    });
+    
+    newSendTransport.on("produce", async (content, callback) => {
+      const { kind, rtpParameters } = content;
+      console.log("-> PRODUCE: ", content);
+      socket?.emit("produce", { transportId: newSendTransport.id, kind, rtpParameters, appData: {v:"SKIBID"} }, callback);
+    });
+    producerTransport.value = newSendTransport;
+    console.log(`++ Creating producer (id=${newSendTransport.id}) transport`);
   return newSendTransport;
 }
 
@@ -394,16 +395,14 @@ const getDevice = async (routerRtpCapabilities=null) => {
 function bindConsumer(producerData) {
   const {id, producerId, params} = producerData;
 
-  console.log(id, producerId, params);
+  console.log("Binding consumer for", producerId);
   // Ignore if consumer is already bound
   if (producers[producerId]) {
-    console.log("bindConsumer | Consumer already bound");
     return;
   }
 
   producers[producerId] = 1;
 
-  console.log("bindConsumer | Try", producerId);
   return new Promise(async (resolve, reject) => {
     const device = await getDevice();
     socket?.emit("consume", { producerId, rtpCapabilities: device.rtpCapabilities }, async (consumerOptions) => {
@@ -420,13 +419,15 @@ function bindConsumer(producerData) {
       // const consumerTransport = device?.createRecvTransport(consumerOptions);
       
       const kind = consumerOptions.kind;
+
       const conTranProps = {
-        id: producerId,
+        id: consumerOptions.id,
         kind,
         producerId,
         rtpCapabilities: device.rtpCapabilities,
         rtpParameters: consumerOptions.rtpParameters,
       }
+
       const consumer = await consumerTransport?.consume(conTranProps);
       const stream = new MediaStream();
 
@@ -441,17 +442,6 @@ function bindConsumer(producerData) {
         video: kind === "video",
         stream,
       });
-
-      // // Add to videos div
-      // if (consumer.kind === 'video') {
-      //   const video = document.createElement('video');
-      //   video.srcObject = new MediaStream([consumer.track]);
-      //   video.autoplay = true;
-
-      //   video.style.zIndex = "100";
-
-      //   document.getElementById("videos")?.appendChild(video);
-      // }
 
       // Check tracks exist
       if (!consumer.track) {
@@ -477,10 +467,6 @@ function bindConsumer(producerData) {
 
           // Call play
           videoElement.play();
-
-
-          // Notifying the server to resume media consumption
-          socket?.emit("consume-resume");
       }
       // } else if (consumer.kind === "audio") {
       //     const audioElement = document.createElement("audio");
@@ -517,7 +503,7 @@ async function initializeStreams(hasMedia=true) {
         return;
       }
 
-      console.log(producerTransport)
+      console.log("PRODUCER TRANSPORT ID", producerTransport.id)
 
 
       if (hasMedia) {

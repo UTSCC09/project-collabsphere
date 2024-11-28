@@ -201,9 +201,9 @@ const bind_mediasoup = (socket, sessionId, id) => {
   });  
 
 
-  socket.on("produce", async ({transportId, kind, rtpParameters}, callback) => {
+  socket.on("produce", async ({transportId, kind, rtpParameters, appData}, callback) => {
     console.log(`(produce) called by ${label}`);
-
+    console.log("appData:", appData);
     const room = get_room(sessionId);
     const transport = transports.get(transportId);
 
@@ -218,7 +218,8 @@ const bind_mediasoup = (socket, sessionId, id) => {
     
     socket.to(sessionId).emit("new_producer", { 
       params: producer.rtpParameters,
-      producerId: producer.id, kind,
+      producerId: producer.id, 
+      kind,
     });
 
     callback({ id: producer.id });
@@ -238,12 +239,10 @@ const bind_mediasoup = (socket, sessionId, id) => {
     
     callback(transport_callback_data);
  
-
-
     socket.on("consume", async ({ producerId, rtpCapabilities }, callback) => {
       console.log(`(consume) called by ${label}`);
 
-      const router = ms_router; //[sessionId];
+      const router = ms_router;
       
       if (!router.canConsume({producerId, rtpCapabilities})) {
         console.log("Cannot Consume");
@@ -265,10 +264,10 @@ const bind_mediasoup = (socket, sessionId, id) => {
         producerId,
         kind: consumer.kind,
         params: consumer.rtpParameters,
+        rtpParameters: consumer.rtpParameters,
         iceParameters: transport.iceParameters,
         iceCandidates: transport.iceCandidates,
         dtlsParameters: transport.dtlsParameters,
-        rtpParameters: consumer.rtpParameters,
       }
 
       console.log("Consumer Callback Information:", callback_data);
