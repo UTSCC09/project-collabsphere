@@ -41,6 +41,7 @@ const cursorIds: string[] = [];
 // null while no file has been uploaded
 const file: Ref<Blob | null> = ref(null);
 const documentReaderRef: Ref<Component | null> = ref(null);
+const sharedNotesRef: Ref<Component | null> = ref(null);
 
 interface data {
   x?: number,
@@ -116,9 +117,11 @@ function connection_init(conn: Peer) {
       return;
     }
 
-    if (data.request && data.request === "annotations") {
-      documentReaderRef.value.sendAnnotationsTo(conn);
-      return;
+    if (data.request) {
+      if (data.request === "annotations")
+        documentReaderRef.value.sendAnnotationsTo(conn);
+      else if (data.request === "notes")
+        sharedNotesRef.value.transmit();
     }
   });
 
@@ -245,7 +248,7 @@ onBeforeUnmount(() => {
       <div id="main-item" class="basis-2/3">
         <div v-if="mounted">
           <Teleport :disabled="!isFile" to="#top-side-item">
-            <p>MAIN</p>
+            <SharedNote id="notes" :socket="socket" :conns="conns" ref="sharedNotesRef" class="min-h-[50vh] flex flex-col"/>
           </Teleport>
         </div>
         <div v-if="isFile" id="viewer">
@@ -253,18 +256,26 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div id="side-items" class="basis-1/3 ml-5">
-        <div id="top-side-item" class="justify-self-center">
-          <label id="pdf-input" v-if="isHost && !isFile" class="a-href underline font-extrabold text-xl">
+        <div id="temp-side-item" class="m-auto text-center" v-if="isHost && !isFile">
+          <label id="pdf-input" class="a-href underline font-extrabold text-xl">
             <input type="file" @input="handleFileInput" name="upload" accept="application/pdf" class="hidden" />
             Upload PDF
           </label>
         </div>
-        <div id="bottom-side-item" class="min-h-[50vh] flex flex-col">
-          <SharedNote :socket="socket"/>
+        <div id="top-side-item" class="m-auto">
+
         </div>
+        <!--
+        <div id="bottom-side-item" class="min-h-[50vh] flex flex-col">
+          <SharedNote :socket="socket" :conns="conns" ref="sharedNotesRef"/>
+        </div>
+        -->
       </div>
     </div>
   </div>
 </template>
 <style scoped>
+#notes {
+  height: calc(87.5vh - 80px);
+}
 </style>
