@@ -9,6 +9,7 @@ import { useUserdataStore } from "@/stores/userdata";
 import SharedNote from "@/components/SharedNote.vue";
 import ClientAVFrame from '../components/ClientAVFrame.vue'
 import * as mediasoup from "mediasoup-client";
+import { MdCollectionsOutlined } from "oh-vue-icons/icons";
 
 // true if user is host
 const isHost = computed(() => {
@@ -294,50 +295,138 @@ async function sourceSelected(audioSource: string, videoSource: string) {
     // socket.emit("add_stream", stream);
 
 }
-let device: mediasoup.types.Device, producerTransport, consumerTransport, producers = {};
+let producers: { [key: string]: any } = {};
 
-async function bindConsumer(producerId) {
-  console.log("Binding consumer", producerId);
-  console.log("--> Creating consumer transport");
+const device: Ref<mediasoup.types.Device | null> = ref(null);
+// Defined either in bindConsumer (existing streams) 
+// or when a new producer is introduced
+const consumerTransport: Ref<mediasoup.types.Transport | null> = ref(null);
+const producerTransport: Ref<mediasoup.types.Transport | null> = ref(null);
 
-  socket?.emit("consume", { producerId, rtpCapabilities: device.rtpCapabilities }, async (consumerOptions) => {
-    console.log("Consuming");
+/* wrappers to ensure only one transport is created, and is kept track of */
+const createRecvTransport = async (device: mediasoup.types.Device, consumerOptions=null) => {
+  if (consumerTransport.value != null) return consumerTransport.value;
 
-    console.log(consumerOptions)
-    const {error} = consumerOptions;
+  if (consumerOptions == null) {
+    console.error("Consumer options are null");
+    return;
+  }
 
-    if (error) {
-      console.error("Error consuming", error);
-      return;
-    }
+  console.log("++ Creating consumer transport");
+
+  // const params = await new Promise((resolve) => {
+  //   socket?.emit("create_transport", (params) => resolve(params));
+  // });
+  // const newRecvTransport = device.createRecvTransport({...params});
+
+  const newRecvTransport = device.createRecvTransport({...consumerOptions, ...consumerOptions.params});
+  
+  newRecvTransport.on("connect", async ({ dtlsParameters }, callback) => {
+    console.log("Bind consumer transport connected");
+    // Print the id
+    console.log(newRecvTransport.id);
+    socket?.emit("connect_transport", { dtlsParameters }, callback);
+  });
+
+  consumerTransport.value = newRecvTransport;
+  return newRecvTransport;
+}
+
+const createSendTransport = async (device: mediasoup.types.Device, params=null) => {
+  if (producerTransport.value != null) return producerTransport.value;
+
+  if (params == null) {
+    console.error("Producer options are null");
+    return;
+  }
+  console.log("++ Creating producer transport");
+
+  const newSendTransport = device.createSendTransport({...params});
+  newSendTransport.on("connect", async ({ dtlsParameters }, callback) => {
+    console.log("Bind producer transport connected");
+    socket?.emit("connect_transport", { dtlsParameters }, callback);
+  });
+
+  producerTransport.value = newSendTransport;
+  return newSendTransport;
+}
+
+
+const getDevice = async (routerRtpCapabilities=null) => {
+  if (device.value != null) {
+    return device.value;
+  }
+
+  if (routerRtpCapabilities == null) {
+    console.error("Router RTP Capabilities are null");
+    return;
+  }
+  
+  const newDevice = new mediasoup.Device();
+  await newDevice.load({ routerRtpCapabilities });
+
+  device.value = newDevice;
+  return newDevice;
+}
+
+
+function bindConsumer(producerData) {
+  const {id, producerId, params} = producerData;
+
+  // Ignore if consumer is already bound
+  if (producers[producerId]) {
+    console.log("bindConsumer | Consumer already bound");
+    return;
+  }
+
+  console.log("bindConsumer | Try", producerId);
+  return new Promise(async (resolve, reject) => {
+    const device = await getDevice();
+    socket?.emit("consume", { producerId, rtpCapabilities: device.rtpCapabilities }, async (consumerOptions) => {
+      console.log("bindConsumer | Consuming now...");
+
+      console.log(consumerOptions)
+      const {error} = consumerOptions;
+
+      if (error) {
+        reject(`Error consuming ${error}`);
+        return;
+      }
+
+      console.log("Consumer Options", consumerOptions);
+
+      const consumerTransport = await createRecvTransport(device, consumerOptions);
+
+      // const consumerTransport = await createRecvTransport(device, consumerOptions);
+      // const consumerTransport = device?.createRecvTransport(consumerOptions);
+      
+      const kind = consumerOptions.kind;
+      const conTranProps = {
+        id: producerId,
+        kind,
+        producerId,
+        rtpCapabilities: device.rtpCapabilities,
+        rtpParameters: consumerOptions.rtpParameters,
+      }
+      console.log("bindConsumer | Consuming with properties", conTranProps);
+      const consumer = await consumerTransport?.consume(conTranProps);
+      const stream = new MediaStream();
+      stream.addTrack(consumer?.track);
+
+      producers[producerId] = consumer;
+
+      console.log("bindConsumer | Adding client stream");
+      addClientStream({
+        username: producerId,
+        audio: kind === "audio",
+        video: kind === "video",
+        stream: stream,
+      });
+
+      resolve(1);
+    });
+
     
-    const consumerTransport = device.createRecvTransport({...consumerOptions, ...consumerOptions.params});
-
-    consumerTransport.on("connect", async ({ dtlsParameters }, callback) => {
-      console.log("Bind consumer transport connected");
-      socket?.emit("connect_transport", { dtlsParameters }, callback);
-    });
-    const kind = consumerOptions.kind;
-    const conTranProps = {
-      id: consumerOptions.id,
-      kind,
-      producerId,
-      rtpCapabilities: device.rtpCapabilities,
-      rtpParameters: consumerOptions.rtpParameters,
-    }
-    console.log("Consuming with properties", conTranProps);
-    const consumer = await consumerTransport.consume(conTranProps);
-    // const consumer = await consumerTransport.consume({ producerId, kind });
-    const stream = new MediaStream();
-    stream.addTrack(consumer.track);
-
-    console.log("Adding client stream");
-    addClientStream({
-      username: producerId,
-      audio: kind === "audio",
-      video: kind === "video",
-      stream: stream,
-    });
   });
 }
 
@@ -351,14 +440,11 @@ async function initializeStreams(hasMedia=true) {
 
   async function handle_join_stream_room({routerRtpCapabilities, producerIds}) {
     console.log("JOINING STREAM ROOM");
-    device = new mediasoup.Device();
-    await device.load({routerRtpCapabilities});
 
+    const device = await getDevice(routerRtpCapabilities);
 
     async function handle_create_transport(params: mediasoup.types.TransportOptions<mediasoup.types.AppData>) {
-      producerTransport = device.createSendTransport({
-        ...params
-      });
+      const producerTransport = await createSendTransport(device, params);
 
       // Check that producer transport is valid
       if (!producerTransport) {
@@ -368,10 +454,6 @@ async function initializeStreams(hasMedia=true) {
 
       console.log(producerTransport)
 
-      producerTransport.on("connect", async ({ dtlsParameters }, callback) => {
-        console.log("Producer transport connected");
-        socket?.emit("connect_transport", { dtlsParameters }, callback);
-      });
 
       if (hasMedia) {
         console.log("Binding produce function on valid stream");
@@ -391,14 +473,14 @@ async function initializeStreams(hasMedia=true) {
     async function handle_create_transport_after_producer({params, producerId, kind}) {
       console.log("Creating consumer transport");
       console.log(params)
-      consumerTransport = device.createRecvTransport(params);
+      const consumerTransport = await createRecvTransport(device, params);
+      // consumerTransport.value = device.createRecvTransport(params);
 
       consumerTransport.on("connect", async ({ dtlsParameters }, callback) => {
         socket?.emit("connect_transport", { dtlsParameters }, callback);
       });
 
       socket?.emit("consume", {producerId, rtpCapabilities: device.rtpCapabilities}, async (params) => {
-        console.log("On Skibidi Bop");
         const consumer = await consumerTransport.consume(params);
         const stream = new MediaStream();
         stream.addTrack(consumer.track);
@@ -429,13 +511,16 @@ async function initializeStreams(hasMedia=true) {
     socket?.emit("create_transport", handle_create_transport);
 
     // When a new producer is added, bind a consumer
-    socket?.on("new_producer", handle_new_producer)
+    // socket?.on("new_producer", handle_new_producer)
 
     console.log("Received producerIds", producerIds);
     // Bind consumers for all existing producers
     for (const producerId of producerIds) {
-      console.log("Binding Consumer")
-      await bindConsumer(producerId);
+      try {
+        await bindConsumer(producerId);
+      } catch (e) {
+        console.error("Error binding consumer", e);
+      }
     }
   };
   

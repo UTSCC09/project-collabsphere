@@ -154,6 +154,8 @@ io.on("connection", (socket) => {
 
 const bind_mediasoup = (socket, sessionId, id) => {
 
+  let label = Math.random().toString(36).substring(7);
+
   socket.on("join_stream_room", async (callback) => {
     // Create a Router for the room if it doesn't exist
     if (!ms_router[sessionId]) {
@@ -163,7 +165,17 @@ const bind_mediasoup = (socket, sessionId, id) => {
     const room = get_room(sessionId);
     rooms.set(sessionId, room);
 
-    const producerIds = room.producers.map((producer) => producer.id);
+    const producerIds = room.producers.map(([transport, producer]) => {
+      return {
+        id: producer.id, 
+        producerId: producer.id,
+        params: {
+          id: producer.id,
+          kind: producer.kind,
+          rtpParameters: producer.rtpParameters,
+        }
+      }}
+    );
 
     callback({ 
       routerRtpCapabilities: ms_router[sessionId].rtpCapabilities,
@@ -175,46 +187,49 @@ const bind_mediasoup = (socket, sessionId, id) => {
   /* Media Soup Internal */
   socket.on("create_transport", async (callback) => {
     const transport = await createWebRtcTransport(ms_router);
-    callback({
+    const transport_callback_data = {
       id: transport.id,
       iceParameters: transport.iceParameters,
       iceCandidates: transport.iceCandidates,
       dtlsParameters: transport.dtlsParameters,
-    });
+    }
+
+    console.log("Transport Callback Information:", transport_callback_data);
+
+    callback(transport_callback_data);
  
     socket.on("connect_transport", async ({dtlsParameters}, callback) => {
-      console.log(dtlsParameters.fingerprints)
-      console.log("Transport connected");
+      console.log(`${label} -> Transport connected to room ${sessionId}`);
+      console.log(dtlsParameters)
       await transport.connect({ dtlsParameters });
       callback();
     });  
 
     socket.on("produce", async ({kind, rtpParameters}, callback) => {
       console.log("Producer requested");
+      console.log(`Using ${label} as producer`);
 
       const room = get_room(sessionId);
       
       const producer = await transport.produce({ kind, rtpParameters });
 
-      
-      room.producers.push(producer);
+      room.producers.push([transport, producer]);
       rooms.set(sessionId, room);
       
       socket.to(sessionId).emit("new_producer", { 
         params: producer.rtpParameters,
-        producerId: producer.id, kind });
+        producerId: producer.id, kind,
+      });
 
       console.log("Producer created");
       callback({ id: producer.id });
     })
 
     socket.on("consume", async ({ producerId, rtpCapabilities }, callback) => {
-
       console.log("Consumer requested");
+      console.log(`Using ${label} as consumer`);
+
       const router = ms_router; //[sessionId];
-      console.log(router);
-      // const transport = rooms[socket.id].transports.find((t) => t.appData?.consumer);
-      console.log("RTP Capabilities", rtpCapabilities)
       
       if (!router.canConsume({producerId, rtpCapabilities})) {
         console.log("Cannot Consume");
@@ -230,11 +245,9 @@ const bind_mediasoup = (socket, sessionId, id) => {
       const room = get_room(sessionId);
       room.consumers.push(consumer);
       rooms.set(sessionId, room);
-
       
-      callback({ 
+      const callback_data = {
         id: consumer.id,
-        consumerId: consumer.id, 
         producerId,
         kind: consumer.kind,
         params: consumer.rtpParameters,
@@ -242,9 +255,10 @@ const bind_mediasoup = (socket, sessionId, id) => {
         iceCandidates: transport.iceCandidates,
         dtlsParameters: transport.dtlsParameters,
         rtpParameters: consumer.rtpParameters,
-        
-      
-      });
+      }
+
+      console.log("Consumer Callback Information:", callback_data);
+      callback(callback_data);
     });
 
   });
