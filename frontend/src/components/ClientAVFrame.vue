@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, type Ref } from 'vue'
+import { computed, onMounted, ref, watch, type Ref } from 'vue'
 import type { Socket } from 'socket.io-client'
 import ClientAVMenu from './ClientAVMenu.vue'
 import { useUserdataStore } from '@/stores/userdata';
@@ -21,6 +21,7 @@ const props = defineProps<{
     socket: Ref<Socket | null>;
 }>();
 
+console.log(props.data.stream);
 const isMyself = computed(() => {
     return userdata.username === props.data.username
 })
@@ -54,7 +55,13 @@ function toggleVideo() {
 }
 
 
+const video = ref<HTMLVideoElement | null>(null);
 
+watch(() => props.datastream, (newStream) => {
+    if (video.value) {
+        video.value.srcObject = newStream;
+    }
+})
 // Mounted
 onMounted(async () => {
 
@@ -63,7 +70,12 @@ onMounted(async () => {
     } else {
         // sourceSelected(props.data.audioSource, props.data.videoSource);
     }
+
+    if (video.value) {
+        video.value.srcObject = props.data.stream;
+    }
 })
+
 
 
 </script>
@@ -72,7 +84,7 @@ onMounted(async () => {
     <div class="bg-black w-64 text-white rounded-md overflow-clip relative" >
         <ClientAVMenu class="absolute z-[100] top-2 right-2"/>
         <div class="w-64 h-44 top-0 relative">
-            <video :srcObject="props.data.stream" class="w-full h-full top-0 absolute left-0 rounded-lg scale-110 " autoplay></video>
+            <video ref="video" class="w-full h-full top-0 absolute left-0 rounded-lg scale-110 " autoplay></video>
         </div>
         <h3 class="font-semibold absolute top-2 left-2   bg-black/50 backdrop -blur-sm px-2" v-text="props.data.username" ></h3 class="font-semibold">
         <div class="flex items-center justify-center gap-2 relative z-[100] bg-black p-2" v-if="isMyself && video && video.value">

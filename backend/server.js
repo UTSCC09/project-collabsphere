@@ -152,6 +152,8 @@ io.on("connection", (socket) => {
 });
 
 
+const transports = new Map();
+
 const bind_mediasoup = (socket, sessionId, id) => {
 
   let label = Math.random().toString(36).substring(7);
@@ -181,8 +183,46 @@ const bind_mediasoup = (socket, sessionId, id) => {
       routerRtpCapabilities: ms_router[sessionId].rtpCapabilities,
       producerIds 
     });
+
   });
 
+
+  socket.on("connect_transport", async ({transportId, dtlsParameters}, callback) => {
+    console.log(`${label}(tr=${transportId}) -> Transport connected to room ${sessionId}`);
+    const transport = transports.get(transportId);
+    if (!transport) {
+      console.error("Transport not found");
+      return;
+    }
+
+    console.log(dtlsParameters)
+    await transport.connect({ dtlsParameters });
+    callback();
+  });  
+
+
+  socket.on("produce", async ({transportId, kind, rtpParameters}, callback) => {
+    console.log(`(produce) called by ${label}`);
+
+    const room = get_room(sessionId);
+    const transport = transports.get(transportId);
+
+    if (!transport) {
+      console.error("Transport not found");
+      return;
+    }
+
+    const producer = await transport.produce({ kind, rtpParameters });
+    room.producers.push([transport, producer]);
+    rooms.set(sessionId, room);
+    
+    socket.to(sessionId).emit("new_producer", { 
+      params: producer.rtpParameters,
+      producerId: producer.id, kind,
+    });
+
+    callback({ id: producer.id });
+  })
 
   /* Media Soup Internal */
   socket.on("create_transport", async (callback) => {
@@ -195,39 +235,13 @@ const bind_mediasoup = (socket, sessionId, id) => {
     }
 
     console.log("Transport Callback Information:", transport_callback_data);
-
+    
     callback(transport_callback_data);
  
-    socket.on("connect_transport", async ({dtlsParameters}, callback) => {
-      console.log(`${label} -> Transport connected to room ${sessionId}`);
-      console.log(dtlsParameters)
-      await transport.connect({ dtlsParameters });
-      callback();
-    });  
 
-    socket.on("produce", async ({kind, rtpParameters}, callback) => {
-      console.log("Producer requested");
-      console.log(`Using ${label} as producer`);
-
-      const room = get_room(sessionId);
-      
-      const producer = await transport.produce({ kind, rtpParameters });
-
-      room.producers.push([transport, producer]);
-      rooms.set(sessionId, room);
-      
-      socket.to(sessionId).emit("new_producer", { 
-        params: producer.rtpParameters,
-        producerId: producer.id, kind,
-      });
-
-      console.log("Producer created");
-      callback({ id: producer.id });
-    })
 
     socket.on("consume", async ({ producerId, rtpCapabilities }, callback) => {
-      console.log("Consumer requested");
-      console.log(`Using ${label} as consumer`);
+      console.log(`(consume) called by ${label}`);
 
       const router = ms_router; //[sessionId];
       
@@ -267,12 +281,17 @@ const bind_mediasoup = (socket, sessionId, id) => {
 
 const createWebRtcTransport = async (router) => {
   const transport = await router.createWebRtcTransport({
-    listenIps: [{ ip: '127.0.0.1', announcedIp: null }], // 127.0.0.1 incompatible with Firefox
+    listenIps: [{ ip: '127.0.0.1', announcedIp: null },
+      {
+        ip: '0.0.0.0', announcedIp: null
+      }
+    ], // 127.0.0.1 incompatible with Firefox
     enableUdp: true,
     enableTcp: true,
     preferUdp: true,
   });
 
+  transports.set(transport.id, transport);
 
   transport.on('dtlsstatechange', dtlsState => {
     if (dtlsState === 'closed') {
