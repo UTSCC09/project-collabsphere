@@ -1,6 +1,5 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import router from '@/router'
 
 // Dummy fields until we have a real user store
 export const useUserdataStore = defineStore('userdata', () => {
@@ -27,8 +26,6 @@ export const useUserdataStore = defineStore('userdata', () => {
       isHost.value = false
 
       clearLocalStorage()
-    }).finally(() =>{
-      router.push({name: 'home'});
     });
   }
 
