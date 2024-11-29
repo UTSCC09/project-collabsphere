@@ -113,7 +113,7 @@ if (process.env.NODE_ENV !== 'test') {
 
 }
 
-import { ms_bind, ms_remove_room } from "./mediasoup-setup.js";
+import { ms_bind, ms_client_disconnect } from "./mediasoup-setup.js";
 
 io.on("connection", (socket) => {
 	socket.on("join_session", async (sessionId, id) => {
@@ -129,7 +129,7 @@ io.on("connection", (socket) => {
 		socket.on("disconnect", () => {
 			console.log("Client Disconnected:", id);
 
-			ms_remove_room(socket.id);
+			ms_client_disconnect(sessionId, id);
 
 			socket.to(sessionId).emit("user_disconnection", id);
 			socket.leave(sessionId);

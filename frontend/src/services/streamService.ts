@@ -11,12 +11,63 @@ Process is as follows:
 
 */
 
+const PRINT_DEBUG = true;
+const log = (...args) =>{
+  if (PRINT_DEBUG) {
+    console.log(...args)
+  }
+}
+
+const media_configs ={
+  encodings: [
+    {
+      kind: "audio",
+      mimeType: "audio/opus",
+      clockRate: 48000,
+      channels: 2,
+    },
+    {
+      kind: "audio",
+      mimeType: "audio/PCMU",
+      clockRate: 8000,
+      channels: 1,
+    },
+    {
+      kind: "video",
+      mimeType: "video/VP8",
+      clockRate: 90000,
+      parameters: {
+        "x-google-start-bitrate": 1000,
+      },
+    },
+    {
+      kind: "video",
+      mimeType: "video/VP9",
+      clockRate: 90000,
+    },
+    {
+      kind: "video",
+      mimeType: "video/H264",
+      clockRate: 90000,
+      parameters: {
+        "packetization-mode": 1,
+        "profile-level-id": "42e01f",
+        "level-asymmetry-allowed": 1,
+      },
+    },
+  ],
+  // https://mediasoup.org/documentation/v3/mediasoup-client/api/#ProducerCodecOptions
+  codecOptions: {
+    videoGoogleStartBitrate: 1000
+  },
+}
 
 import * as mediasoup from 'mediasoup-client'
 import type { TransportOptions } from 'mediasoup-client/lib/types'
 import { ref, toRaw, type Ref } from 'vue'
 import { Socket } from 'socket.io-client'
 
+let myProducerId = null
 let username = "unknown";
 
 interface ClientStreamData {
@@ -95,8 +146,7 @@ const createSendTransport = async (
   })
 
   newSendTransport.on('produce', async (content, callback) => {
-    const { kind, rtpParameters } = content
-    console.log('-> PRODUCE: ', content)
+    const { kind, rtpParameters, appData } = content
 
     // Call the server to setup the producer.
     socket?.emit(
@@ -105,7 +155,7 @@ const createSendTransport = async (
         transportId: newSendTransport.id,
         kind,
         rtpParameters,
-        appData: { v: 'Sample App Data' },
+        appData
       },
       (response) => {
 
@@ -114,9 +164,8 @@ const createSendTransport = async (
           callback({ error: response.error })
           return
         }
+        const { id } = response
 
-        const {id} = response
-        console.log('Producer ID:', id)
         callback({ id })
       },
     )
@@ -158,8 +207,13 @@ const getDevice = async (
 }
 
 function bindConsumer(producerData) {
-  const { producerId, params } = producerData
-
+  const { producerId, params, appData } = producerData
+  let client_username = "unknown"
+  if (appData) {
+    client_username = appData.username || "unknown"
+  }
+  console.log(params, "Appdata", appData)
+  console.log("CONSUMER", client_username)
   // Check if producer already exists
   if (producers[producerId]) return
   producers[producerId] = 1
@@ -171,12 +225,14 @@ function bindConsumer(producerData) {
     socket?.emit('consume', { 
       transportId: consumerTransport.id,
       producerId, rtpCapabilities: device.rtpCapabilities 
-    }, async ({ params }) => {
-        const { error } = params
+    }, async ({ params, error }) => {
 
         if (error) {
+          console.log('Error consuming', error)
           return reject(Error(`Cannot consume`))
         }
+
+        console.log(params.appData)
 
         const kind = params.kind
 
@@ -199,10 +255,11 @@ function bindConsumer(producerData) {
         } 
 
         console.log("8. Retrieving consumer")
-        console.log(consumer)
+        console.log('Consumer', consumer)        
+
         addClientStream({
           id: params.id,
-          username: params.appData.username,
+          username: client_username,
           audio: kind === 'audio',
           video: kind === 'video',
           stream: new MediaStream([consumer.track]),
@@ -215,8 +272,20 @@ function bindConsumer(producerData) {
   })
 }
 
-async function bindExistingConsumers() {
+async function bindExistingConsumers(producerIds) {
+  console.log("ProducerID's to consume:", producerIds)
+  // Bind consumers for all existing producers
+  for (const producerId of producerIds) {
+    if (producerId == myProducerId) {
+      continue
+    }
 
+    try {
+      await bindConsumer(producerId);
+    } catch (e) {
+      console.error("Error binding consumer", e);
+    }
+  }
 }
 
 async function initializeStreams(data, hasMedia = true) {
@@ -241,76 +310,29 @@ async function initializeStreams(data, hasMedia = true) {
     const videoTrack = stream?.getVideoTracks()[0]
 
     const passable_data = {
-      encodings: [
-        {
-          kind: "audio",
-          mimeType: "audio/opus",
-          clockRate: 48000,
-          channels: 2,
-        },
-        {
-          kind: "audio",
-          mimeType: "audio/PCMU",
-          clockRate: 8000,
-          channels: 1,
-        },
-        {
-          kind: "video",
-          mimeType: "video/VP8",
-          clockRate: 90000,
-          parameters: {
-            "x-google-start-bitrate": 1000,
-          },
-        },
-        {
-          kind: "video",
-          mimeType: "video/VP9",
-          clockRate: 90000,
-        },
-        {
-          kind: "video",
-          mimeType: "video/H264",
-          clockRate: 90000,
-          parameters: {
-            "packetization-mode": 1,
-            "profile-level-id": "42e01f",
-            "level-asymmetry-allowed": 1,
-          },
-        },
-      ],
-      // https://mediasoup.org/documentation/v3/mediasoup-client/api/#ProducerCodecOptions
-      codecOptions: {
-        videoGoogleStartBitrate: 1000
-      },
+      ...media_configs,
       track: videoTrack,
-      appData: { username },
+      appData: { username}
     }
 
     const prod_trans = await producerTransport.produce(passable_data)
 
+    myProducerId = prod_trans.id;
     if (prod_trans.paused) {
       await prod_trans.resume()
     }
     
     console.log('Track ID:', prod_trans.id)
-    return prod_trans.id;
   }
   
 
   // Create producer transport
   socket?.on('new_producer', async producerData => {
+    console.log('New producer', producerData)
     await bindConsumer(producerData)
   })
 
-  console.log("ProducerID's to consume:", producerIds)
-  // Bind consumers for all existing producers
-  for (const producerId of producerIds) {
-    try {
-      await bindConsumer(producerId);
-    } catch (e) {
-      console.error("Error binding consumer", e);
-    }
-  }
+  bindExistingConsumers(producerIds)
 }
 
 async function retrieveLocalStream() {
@@ -378,14 +400,6 @@ async function setupMedia(_socket: Socket, _username: string) {
   const local_stream = await retrieveLocalStream()
   if (!local_stream) { return console.error('No stream found') }
 
-  // local_stream.value = new_local_stream
-  addClientStream({
-    username: 'You',
-    audio: true,
-    video: true,
-    stream: local_stream,
-  })
-
   // Fetch RTP Capabilities
   const {rtpCapabilities} = await new Promise(resolve => {
     socket?.emit('get_rtp_capabilities', resolve)
@@ -408,8 +422,22 @@ async function setupMedia(_socket: Socket, _username: string) {
 
   // Initialize streams
   socket?.emit('join_stream_room', async (params) =>{
-    const producerId = await initializeStreams(params, hasMedia)
-    bindConsumer({ producerId })
+    await initializeStreams(params, hasMedia)
+
+    if (myProducerId) {
+      addClientStream({
+        id: myProducerId,
+        username: 'You',
+        audio: true,
+        video: true,
+        stream: local_stream,
+      })
+    }
+  })
+
+  socket?.on("remove_client", (id) => {
+    console.log("Client removed", id)
+    removeClientStream(id)
   })
   
 }

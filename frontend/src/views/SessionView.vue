@@ -249,7 +249,7 @@ onBeforeUnmount(() => {
 });
 
 onMounted(() => {
-  setupMedia(socket, username);
+  setupMedia(socket, username.value);
 });
 
 </script>

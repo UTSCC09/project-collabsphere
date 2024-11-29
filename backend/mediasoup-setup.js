@@ -76,8 +76,9 @@ let ms_router;
 const rooms = new Map();
 
 const get_room = (sessionId) => {
-	return rooms.get(sessionId) || { transports: [], producers: [], consumers: [] };
+	return rooms.get(sessionId) || { producers: [], consumers: [], clients: new Map() };
 };
+
 const transports = new Map();
 
 const createWorker = async () => {
@@ -103,9 +104,10 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		}
 
 		const room = get_room(sessionId);
+		room.clients.set(id, { socket });
 		rooms.set(sessionId, room);
 
-		const producerIds = room.producers.map(([transport, producer]) => {
+		const producerIds = room.producers.map((producer) => {
 			return {
 				id: producer.id,
 				producerId: producer.id,
@@ -114,6 +116,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 					kind: producer.kind,
 					rtpParameters: producer.rtpParameters,
 				},
+				appData: producer.appData,
 			};
 		});
 
@@ -136,8 +139,6 @@ const bind_mediasoup = (socket, sessionId, id) => {
 
 	socket.on("get_rtp_capabilities", (callback) => {
 		const rtpCapabilities = ms_router.rtpCapabilities;
-		console.log("RTP Capabilities:", rtpCapabilities);
-
 		callback({ rtpCapabilities });
 	});
 
@@ -145,21 +146,27 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		console.log(`(produce) called by ${label}(tr=${transportId})`);
 		const room = get_room(sessionId);
 		const transport = transports.get(transportId);
-
+		
 		if (!transport) {
 			console.error("Transport not found");
 			callback({ error: "Transport not found" });
 			return;
 		}
 
-		const producer = await transport.produce({ kind, rtpParameters});
-		room.producers.push([transport, producer]);
+		console.log("Producer Sent App Data:", appData);
+		const producer = await transport.produce({ kind, rtpParameters, appData});
+		room.producers.push(producer);
+		const client = room.clients.get(id)
+		if (client) {
+			client["producer"] = producer.id;
+		}
 		rooms.set(sessionId, room);
-
+		
 		socket.to(sessionId).emit("new_producer", {
 			params: producer.rtpParameters,
 			producerId: producer.id,
 			kind,
+			appData: producer.appData
 		});
 
 		callback({ id: producer.id });
@@ -181,13 +188,20 @@ const bind_mediasoup = (socket, sessionId, id) => {
 	socket.on("consume", async ({ transportId, producerId, rtpCapabilities }, callback) => {
 		const room = get_room(sessionId);
 		const transport = transports.get(transportId);
+		const producerTransport = room.producers.find((p) => p.id === producerId);
 		
 		if (!transport) {
 			console.error("Transport not found");
 			callback({ error: "Transport not found" });
 			return;
 		}
-		
+
+		if (!producerTransport) {
+			console.error("Producer Transport not found");
+			callback({ error: "Producer Transport not found" });
+			return;
+		}
+
 		console.log(`(consume) called by ${label}(tr=${transport.id})`);
 		const router = ms_router;
 
@@ -195,7 +209,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			console.log("Cannot Consume");
 			return callback({ error: "Cannot consume" });
 		}
-
+		
 		const consumer = await transport.consume({
 			producerId,
 			rtpCapabilities,
@@ -203,12 +217,18 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		});
 
 		room.consumers.push(consumer);
+		const client = room.clients.get(id)
+		if (client) {
+			client["consumer"] = consumer.id;
+		}
 		rooms.set(sessionId, room);
 
 		const params = {
 			id: consumer.id,
 			producerId: producerId,
 			kind: consumer.kind,
+			appData: producerTransport.appData,
+
 			rtpParameters: consumer.rtpParameters,
 			iceParameters: transport.iceParameters,
 			iceCandidates: transport.iceCandidates,
@@ -227,7 +247,6 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			console.error("Consumer not found");
 			return;
 		}
-
 		await consumer.resume();
 	});
 };
@@ -245,7 +264,7 @@ const createWebRtcTransport = async (router) => {
 	});
 
 	transports.set(transport.id, transport);
-
+	
 	transport.on("dtlsstatechange", (dtlsState) => {
 		if (dtlsState === "closed") {
 			transport.close();
@@ -263,12 +282,55 @@ const createWebRtcTransport = async (router) => {
 	return transport;
 };
 
+
 const remove_room = (socketId) => {
 	delete rooms[socketId];
 };
+
+const client_disconnect = (sessionId, id) => {
+	const room = get_room(sessionId);
+	if (!room) {
+		console.log("Room not found");
+		return;
+	}
+	
+	const client = room.clients.get(id);
+	if (!client) {
+		console.log("Client not found");
+		return;
+	}
+	
+	const socket = client.socket
+
+	if (!socket) {
+		console.log("Socket not found");
+		return;
+	}
+
+	socket.to(sessionId).emit("remove_client", id);
+
+	const producerId = client.producer;
+	const consumerId = client.consumer;
+
+	if (producerId) {
+		const producer = room.producers.find((p) => p.id === producerId);
+		producer.close();
+		room.producers = room.producers.filter((p) => p.id !== producerId);
+	}
+
+	if (consumerId) {
+		const consumer = room.consumers.find((c) => c.id === consumerId);
+		consumer.close();
+		room.consumers = room.consumers.filter((c) => c.id !== consumerId);
+	}
+
+	delete room.clients[id];
+
+	rooms.set(sessionId, room);
+}
 
 (async () => {
 	await createWorker();
 })();
 
-export { bind_mediasoup as ms_bind, remove_room as ms_remove_room };
+export { bind_mediasoup as ms_bind, remove_room as ms_remove_room, client_disconnect as ms_client_disconnect };
