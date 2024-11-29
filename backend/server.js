@@ -57,6 +57,7 @@ const io = new Server(httpsSocketServer, {
 
 httpsSocketServer.listen(3030);
 
+console.log("PRIVATE KEY PATH", process.env.SSL_PRIVATE_KEY_PATH);
 // const pServer = app.listen(1234);
 const peerServer = ExpressPeerServer(server, {
 	// debug: true,
@@ -68,9 +69,10 @@ const peerServer = ExpressPeerServer(server, {
 	//   key: config.key,
 	//   cert: config.cert
 	// },
-	sslkey: `C:/Users/talba/Documents/Miscellaneous Shared/GitHub/project-collabsphere/ssl/privkey.pem`,
-	sslcert: `C:/Users/talba/Documents/Miscellaneous Shared/GitHub/project-collabsphere/ssl/cert.pem`,
-
+	// sslkey: `C:/Users/talba/Documents/Miscellaneous Shared/GitHub/project-collabsphere/ssl/privkey.pem`,
+	// sslcert: `C:/Users/talba/Documents/Miscellaneous Shared/GitHub/project-collabsphere/ssl/cert.pem`,
+  sslkey: process.env.SSL_PRIVATE_KEY_PATH,
+  sslcert: process.env.SSL_CERTIFICATE_PATH,
 	// sslkey: '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem',
 	// sslcert: '/etc/letsencrypt/live/collabsphere.xyz/cert.pem',
 	generateClientId: customGenerationFunction,

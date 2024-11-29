@@ -57,8 +57,6 @@ interface data {
   file?: Blob,
   annotations?: any,
 }
-const videoElem = ref<HTMLVideoElement | null>(null)
-
 
 let socket: Socket | null = null;
 
@@ -251,14 +249,13 @@ onBeforeUnmount(() => {
 });
 
 onMounted(() => {
-  setupMedia(socket, videoElem);
+  setupMedia(socket, username);
 });
 
 </script>
 
 <template>
   <div>
-    <video ref="videoElem"></video>
     <h1 class="ml-2"><v-icon name='fa-users' class="scale-105"/> <span v-text="clientConfigData.length"/> Connected </h1>
     <CursorItem v-for="cursor in cursors" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" style="z-index:100"/>
     <hr class="my-3" />
@@ -295,3 +292,4 @@ onMounted(() => {
 </template>
 <style scoped>
 </style>
+

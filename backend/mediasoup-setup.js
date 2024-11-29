@@ -9,16 +9,16 @@ const workerSettings = {
 	//  rtcMinPort: 10000,
 	//  rtcMaxPort: 10100
 	logTags: ["info", "ice", "dtls", "rtp", "srtp", "rtcp", "rbe", "rtx"],
-	rtcIPv4: true,
-	rtcIPv6: true,
-	rtcAnnouncedIPv4: null,
-	rtcAnnouncedIPv6: null,
+	// rtcIPv4: true,
+	// rtcIPv6: true,
+	// rtcAnnouncedIPv4: null,
+	// rtcAnnouncedIPv6: null,
 	rtcMinPort: 40000,
-	rtcMaxPort: 49999,
-
-	dtlsCertificateFile: `C:/Users/talba/Documents/Miscellaneous Shared/GitHub/project-collabsphere/ssl/cert.pem`,
-	dtlsPrivateKeyFile: `C:/Users/talba/Documents/Miscellaneous Shared/GitHub/project-collabsphere/ssl/privkey.pem`,
+	rtcMaxPort: 49000,
+	dtlsCertificateFile: process.env.SSL_CERTIFICATE_PATH,
+	dtlsPrivateKeyFile: process.env.SSL_PRIVATE_KEY_PATH,
 };
+
 
 const ms_routerOptions = {
 	// mediasoup Server settings.
@@ -29,6 +29,7 @@ const ms_routerOptions = {
 	rtcAnnouncedIPv4: null,
 	rtcAnnouncedIPv6: null,
 	mediaCodecs: [
+
 		{
 			kind: "audio",
 			mimeType: "audio/opus",
@@ -151,7 +152,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			return;
 		}
 
-		const producer = await transport.produce({ kind, rtpParameters });
+		const producer = await transport.produce({ kind, rtpParameters});
 		room.producers.push([transport, producer]);
 		rooms.set(sessionId, room);
 
@@ -174,43 +175,48 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			dtlsParameters: transport.dtlsParameters,
 		};
 
-		// console.log("Transport Callback Information:", transport_callback_data);
-
 		callback(transport_callback_data);
+	});
 
-		socket.on("consume", async ({ producerId, rtpCapabilities }, callback) => {
-			console.log(`(consume) called by ${label}(tr=${transport.id})`);
+	socket.on("consume", async ({ transportId, producerId, rtpCapabilities }, callback) => {
+		const room = get_room(sessionId);
+		const transport = transports.get(transportId);
+		
+		if (!transport) {
+			console.error("Transport not found");
+			callback({ error: "Transport not found" });
+			return;
+		}
+		
+		console.log(`(consume) called by ${label}(tr=${transport.id})`);
+		const router = ms_router;
 
-			const router = ms_router;
+		if (!router.canConsume({ producerId, rtpCapabilities })) {
+			console.log("Cannot Consume");
+			return callback({ error: "Cannot consume" });
+		}
 
-			if (!router.canConsume({ producerId, rtpCapabilities })) {
-				console.log("Cannot Consume");
-				return callback({ error: "Cannot consume" });
-			}
-
-			const consumer = await transport.consume({
-				producerId,
-				rtpCapabilities,
-				paused: false,
-			});
-
-			const room = get_room(sessionId);
-			room.consumers.push(consumer);
-			rooms.set(sessionId, room);
-
-			const params = {
-				id: consumer.id,
-				producerId: producerId,
-				kind: consumer.kind,
-				rtpParameters: consumer.rtpParameters,
-				iceParameters: transport.iceParameters,
-				iceCandidates: transport.iceCandidates,
-				dtlsParameters: transport.dtlsParameters,
-			};
-
-			// console.log("Consumer Callback Information:", callback_data);
-			callback({ params });
+		const consumer = await transport.consume({
+			producerId,
+			rtpCapabilities,
+			paused: false,
 		});
+
+		room.consumers.push(consumer);
+		rooms.set(sessionId, room);
+
+		const params = {
+			id: consumer.id,
+			producerId: producerId,
+			kind: consumer.kind,
+			rtpParameters: consumer.rtpParameters,
+			iceParameters: transport.iceParameters,
+			iceCandidates: transport.iceCandidates,
+			dtlsParameters: transport.dtlsParameters,
+		};
+
+		// console.log("Consumer Callback Information:", callback_data);
+		callback({ params });
 	});
 
 	socket.on("consumer-resume", async ({ consumerId }) => {
@@ -230,7 +236,7 @@ const createWebRtcTransport = async (router) => {
 	const transport = await router.createWebRtcTransport({
 		listenIps: [
 			{ ip: "0.0.0.0", announcedIp: "127.0.0.1" },
-			{ ip: "127.0.0.1", announcedIp: null },
+			{ ip: "0.0.0.0", announcedIp: "localhost"},
 		], // 127.0.0.1 incompatible with Firefox
 
 		enableUdp: true,

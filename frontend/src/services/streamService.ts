@@ -1,7 +1,23 @@
+/*
+
+Process is as follows:
+1. Retrieve local stream
+2. Fetch RTP Capabilities
+3. Create a mediasoup Device
+4. Create a producer transport
+5. Connect producer transport
+6. Create receiver transport
+7. Connect receiver transport
+
+*/
+
+
 import * as mediasoup from 'mediasoup-client'
 import type { TransportOptions } from 'mediasoup-client/lib/types'
-import { ref, type Ref } from 'vue'
+import { ref, toRaw, type Ref } from 'vue'
 import { Socket } from 'socket.io-client'
+
+let username = "unknown";
 
 interface ClientStreamData {
   id?: string
@@ -20,84 +36,97 @@ const device: Ref<mediasoup.types.Device | null> = ref(null)
 const consumerTransport: Ref<mediasoup.types.Transport | null> = ref(null)
 const producerTransport: Ref<mediasoup.types.Transport | null> = ref(null)
 const clientConfigData: Ref<ClientStreamData[]> = ref([])
-let videoElem
 
 /* wrappers to ensure only one transport is created, and is kept track of */
 const createRecvTransport = async (
   device: mediasoup.types.Device,
-  consumerOptions = null,
 ) => {
-  if (consumerTransport.value != null) return consumerTransport.value
+  if (consumerTransport.value != null) return toRaw(consumerTransport.value)
 
-  let params
+  const params = await new Promise(resolve =>
+    socket?.emit('create_transport', params => {
+      resolve(params)
+    }),
+  )
 
-  if (consumerOptions)
-    params = { ...consumerOptions, ...consumerOptions.params }
-  if (consumerOptions == null) {
-    console.error('Consumer options are null')
-
-    const data = await new Promise(resolve =>
-      socket?.emit('create_transport', params => {
-        resolve(params)
-      }),
-    )
-
-    params = data
-  }
-
-  const newRecvTransport = device.createRecvTransport({ ...params })
+  console.log('Params', params)
+  const newRecvTransport = device.createRecvTransport(params)
 
   newRecvTransport.on('connect', async ({ dtlsParameters }, callback) => {
     socket?.emit(
       'connect_transport',
       { transportId: newRecvTransport.id, dtlsParameters },
-      callback,
+        () => {
+          console.log("7. Consumer Connected transport")
+          callback()
+        }
     )
   })
 
   consumerTransport.value = newRecvTransport
-  console.log(`++ Creating consumer (id=${newRecvTransport.id}) transport`)
+  console.log(`++ 6. Creating consumer (id=${newRecvTransport.id}) transport`)
   return newRecvTransport
 }
 
 const createSendTransport = async (
   device: mediasoup.types.Device,
-  options: TransportOptions | null = null,
+  
 ) => {
-  if (producerTransport.value != null) return producerTransport.value
+  console.log("Producer exists?", toRaw(producerTransport.value))
+  if (producerTransport.value != null) return toRaw(producerTransport.value)
 
-  if (options == null) {
-    console.error('Producer options are null')
-    return
-  }
+  const params = await new Promise(resolve =>
+    socket?.emit('create_transport', params => {
+      resolve(params)
+    }),
+  )
+  console.log('Params', params)
+  // Initialize a producer webRTC transport
+  const newSendTransport = device.createSendTransport(params)
 
-  console.log('Options', options)
-  const newSendTransport = device.createSendTransport(options)
   newSendTransport.on('connect', async ({ dtlsParameters }, callback) => {
     socket?.emit(
       'connect_transport',
       { transportId: newSendTransport.id, dtlsParameters },
-      callback,
-    )
+      () => {
+        console.log("5. Producer Connected transport")
+        callback()
+      })
   })
 
   newSendTransport.on('produce', async (content, callback) => {
     const { kind, rtpParameters } = content
     console.log('-> PRODUCE: ', content)
+
+    // Call the server to setup the producer.
     socket?.emit(
       'produce',
       {
         transportId: newSendTransport.id,
         kind,
         rtpParameters,
-        appData: { v: 'SKIBID' },
+        appData: { v: 'Sample App Data' },
       },
-      callback,
+      (response) => {
+
+        if (response.error) {
+          console.error('Error producing', response.error)
+          callback({ error: response.error })
+          return
+        }
+
+        const {id} = response
+        console.log('Producer ID:', id)
+        callback({ id })
+      },
     )
   })
+
+
   producerTransport.value = newSendTransport
-  console.log(`++ Creating producer (id=${newSendTransport.id}) transport`)
+  console.log(`++ 4. Creating producer (id=${newSendTransport.id}) transport`)
   return newSendTransport
+
 }
 
 const getDevice = async (
@@ -130,29 +159,32 @@ const getDevice = async (
 
 function bindConsumer(producerData) {
   const { producerId, params } = producerData
+
+  // Check if producer already exists
   if (producers[producerId]) return
   producers[producerId] = 1
 
   return new Promise(async (resolve, reject) => {
     const device = await getDevice()
-    socket?.emit(
-      'consume',
-      { producerId, rtpCapabilities: device.rtpCapabilities },
-      async ({ params }) => {
+    const consumerTransport = await createRecvTransport(device)
+
+    socket?.emit('consume', { 
+      transportId: consumerTransport.id,
+      producerId, rtpCapabilities: device.rtpCapabilities 
+    }, async ({ params }) => {
         const { error } = params
 
         if (error) {
           return reject(Error(`Cannot consume`))
         }
 
-        const consumerTransport = await createRecvTransport(device)
         const kind = params.kind
 
         console.log('RTP Capabilities', device.rtpCapabilities)
         const consumer = await consumerTransport?.consume({
-          id: consumerTransport.id,
-          kind,
-          producerId,
+          id: params.id,
+          producerId: params.producerId,
+          kind: params.kind,
           rtpParameters: params.rtpParameters,
         })
 
@@ -164,15 +196,17 @@ function bindConsumer(producerData) {
         if (!consumer.track) {
           console.error('No tracks found')
           return
-        }
+        } 
 
-        if (consumer.kind === 'video') {
-          const videoElement = videoElem.value
-          videoElement.srcObject = new MediaStream([consumer.track])
-          videoElement.muted = true
-          console.log('SRC OBJECT', videoElement.srcObject)
-          videoElement.style.width = '100%'
-        }
+        console.log("8. Retrieving consumer")
+        console.log(consumer)
+        addClientStream({
+          id: params.id,
+          username: params.appData.username,
+          audio: kind === 'audio',
+          video: kind === 'video',
+          stream: new MediaStream([consumer.track]),
+        })
 
         socket?.emit('consumer-resume', { consumerId: params.id })
         resolve(1)
@@ -181,91 +215,133 @@ function bindConsumer(producerData) {
   })
 }
 
-async function initializeStreams(hasMedia = true) {
-  let stream: MediaStream
-  if (hasMedia) {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true,
-    })
-  }
+async function bindExistingConsumers() {
 
-  console.log('Initializing streams')
-
-  async function handle_join_stream_room({
-    routerRtpCapabilities,
-    producerIds,
-  }) {
-    const device = await getDevice(routerRtpCapabilities)
-
-    async function handle_create_transport(
-      params: mediasoup.types.TransportOptions<mediasoup.types.AppData>,
-    ) {
-      const producerTransport = await createSendTransport(device, params)
-
-      // Check that producer transport is valid
-      if (!producerTransport) {
-        console.error('Producer transport is invalid')
-        return
-      }
-
-      console.log('PRODUCER TRANSPORT ID', producerTransport.id)
-
-      if (hasMedia) {
-        const track = stream.getVideoTracks()[0]
-        const prod_trans = await producerTransport.produce({
-          track,
-          //   encodings: [
-          //     { maxBitrate: 100000 },
-          //     { maxBitrate: 300000 },
-          //     { maxBitrate: 900000 },
-          //   ],
-
-          //   codecOptions: {
-          //     opusStereo: true,
-          //     opusDtx: true,
-          //   },
-        })
-        if (prod_trans.paused) {
-          await prod_trans.resume()
-        }
-
-        // Consume test
-        bindConsumer({
-          producerId: prod_trans.id,
-        })
-
-        console.log('Track ID:', prod_trans.id)
-        // for (const track of stream.getTracks()) {
-        // }
-      }
-    }
-
-    // Create producer transport
-    socket?.emit('create_transport', handle_create_transport)
-
-    socket?.on('new_producer', async producerData => {
-      await bindConsumer(producerData)
-    })
-
-    console.log("ProducerID's to consume:", producerIds)
-    // Bind consumers for all existing producers
-    // for (const producerId of producerIds) {
-    //   try {
-    //     await bindConsumer(producerId);
-    //   } catch (e) {
-    //     console.error("Error binding consumer", e);
-    //   }
-    // }
-  }
-
-  socket?.emit('join_stream_room', handle_join_stream_room)
 }
 
-async function setupMedia(psocket: Socket, pvideoElem) {
-  socket = psocket
-  videoElem = pvideoElem
-  let hasMedia = true
+async function initializeStreams(data, hasMedia = true) {
+  console.log('Initializing streams')
+  const { routerRtpCapabilities, producerIds } = data
+  
+  const device = await getDevice(routerRtpCapabilities)
+
+  console.log('PRODUCER TRANSPORT ID', producerTransport.id)
+  
+  if (hasMedia) {
+    
+    const producerTransport = await createSendTransport(device)
+    // Check that producer transport is valid
+    if (!producerTransport) {
+      console.error('Producer transport is invalid')
+      return
+    }
+
+    console.log(producerTransport)
+    const stream = await retrieveLocalStream()
+    const videoTrack = stream?.getVideoTracks()[0]
+
+    const passable_data = {
+      encodings: [
+        {
+          kind: "audio",
+          mimeType: "audio/opus",
+          clockRate: 48000,
+          channels: 2,
+        },
+        {
+          kind: "audio",
+          mimeType: "audio/PCMU",
+          clockRate: 8000,
+          channels: 1,
+        },
+        {
+          kind: "video",
+          mimeType: "video/VP8",
+          clockRate: 90000,
+          parameters: {
+            "x-google-start-bitrate": 1000,
+          },
+        },
+        {
+          kind: "video",
+          mimeType: "video/VP9",
+          clockRate: 90000,
+        },
+        {
+          kind: "video",
+          mimeType: "video/H264",
+          clockRate: 90000,
+          parameters: {
+            "packetization-mode": 1,
+            "profile-level-id": "42e01f",
+            "level-asymmetry-allowed": 1,
+          },
+        },
+      ],
+      // https://mediasoup.org/documentation/v3/mediasoup-client/api/#ProducerCodecOptions
+      codecOptions: {
+        videoGoogleStartBitrate: 1000
+      },
+      track: videoTrack,
+      appData: { username },
+    }
+
+    const prod_trans = await producerTransport.produce(passable_data)
+
+    if (prod_trans.paused) {
+      await prod_trans.resume()
+    }
+    
+    console.log('Track ID:', prod_trans.id)
+    return prod_trans.id;
+  }
+  
+
+  // Create producer transport
+  socket?.on('new_producer', async producerData => {
+    await bindConsumer(producerData)
+  })
+
+  console.log("ProducerID's to consume:", producerIds)
+  // Bind consumers for all existing producers
+  for (const producerId of producerIds) {
+    try {
+      await bindConsumer(producerId);
+    } catch (e) {
+      console.error("Error binding consumer", e);
+    }
+  }
+}
+
+async function retrieveLocalStream() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      // video: true,
+      audio: false,
+      video: {
+        width: {
+          min: 640,
+          max: 1920,
+        },
+        height: {
+          min: 400,
+          max: 1080,
+        }
+      }
+    });
+
+
+    return stream
+  } catch (e) {
+    console.error('Error retrieving local stream', e)
+    return null
+  }
+
+}
+
+
+/* Returns true if has media */
+async function checkHasMedia() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
@@ -281,24 +357,61 @@ async function setupMedia(psocket: Socket, pvideoElem) {
         videoSource = device.deviceId
       }
     })
-
-    addClientStream({
-      username: 'You',
-      audio: true,
-      video: true,
-      stream,
-    })
+    return true
   } catch (err) {
     if (err.name === 'NotFoundError') {
       console.log('No media devices found.')
     } else {
       console.error(`${err.name}: ${err.message}`)
     }
-    hasMedia = false
+    return false
     // alert("navigator.mediaDevices.getUserMedia() is not supported or an error occurred.");
-  } finally {
-    initializeStreams(hasMedia)
   }
+}
+
+async function setupMedia(_socket: Socket, _username: string) {
+  socket = _socket
+  username = _username
+
+  // Retrieve a local stream
+  let hasMedia = await checkHasMedia();
+  const local_stream = await retrieveLocalStream()
+  if (!local_stream) { return console.error('No stream found') }
+
+  // local_stream.value = new_local_stream
+  addClientStream({
+    username: 'You',
+    audio: true,
+    video: true,
+    stream: local_stream,
+  })
+
+  // Fetch RTP Capabilities
+  const {rtpCapabilities} = await new Promise(resolve => {
+    socket?.emit('get_rtp_capabilities', resolve)
+  });
+
+  if (!rtpCapabilities) {
+    return console.error('No router RTP capabilities found')
+  }
+
+  console.log('RTP Capabilities', rtpCapabilities)
+  // Create a mediasoup Device
+  const device = await getDevice(rtpCapabilities);
+  if (!device) {
+    return console.error('No device found')
+  }
+
+  // Create a producer transport (automatically connects)
+  await createSendTransport(device);
+  await createRecvTransport(device);
+
+  // Initialize streams
+  socket?.emit('join_stream_room', async (params) =>{
+    const producerId = await initializeStreams(params, hasMedia)
+    bindConsumer({ producerId })
+  })
+  
 }
 
 function addClientStream(data: ClientStreamData) {
