@@ -189,16 +189,6 @@ onMounted(() => {
     removeClientStream(id);
   });
 
-  socket.on("add_stream", ({id, stream}: {id: string, stream: MediaStream}) => {
-    console.log("Adding stream to video element.");
-    addClientStream({
-      username: id,
-      audio: true,
-      video: true,
-      stream: stream,
-    });
-  });
-
   // when mouse is moved, broadcast mouse position to all connections
   function sendCursor(
       e: MouseEvent,
@@ -285,7 +275,7 @@ onMounted(() => {
       </div>
       <div class="flex flex-col gap-2 w-fit bg-slate-300 overflow-scroll h-[85vh]">
           <!-- For looop  -->
-        <ClientAVFrame v-for="(data, index) in clientConfigData" :key="index" :data="data" :socket="socket"/>
+        <ClientAVFrame v-for="([key, data], index) in clientConfigData.entries()" :key="key" :data="data" :socket="socket"/>
       </div>
     </div>
   </div>

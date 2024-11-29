@@ -4,15 +4,10 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// https://mediasoup.org/documentation/v3/mediasoup/api/#WorkerSettings
 const workerSettings = {
 	logLevel: "warn",
-	//  rtcMinPort: 10000,
-	//  rtcMaxPort: 10100
 	logTags: ["info", "ice", "dtls", "rtp", "srtp", "rtcp", "rbe", "rtx"],
-	// rtcIPv4: true,
-	// rtcIPv6: true,
-	// rtcAnnouncedIPv4: null,
-	// rtcAnnouncedIPv6: null,
 	rtcMinPort: 40000,
 	rtcMaxPort: 49000,
 	dtlsCertificateFile: process.env.SSL_CERTIFICATE_PATH,
@@ -20,16 +15,13 @@ const workerSettings = {
 };
 
 
+// https://mediasoup.org/documentation/v3/mediasoup/api/#RouterOptions
 const ms_routerOptions = {
-	// mediasoup Server settings.
 	logLevel: "warn",
 	logTags: ["info", "ice", "dtls", "rtp", "srtp", "rtcp", "rbe", "rtx"],
 	rtcIPv4: true,
 	rtcIPv6: true,
-	rtcAnnouncedIPv4: null,
-	rtcAnnouncedIPv6: null,
 	mediaCodecs: [
-
 		{
 			kind: "audio",
 			mimeType: "audio/opus",
@@ -94,14 +86,82 @@ const createWorker = async () => {
 	console.log(`Worker: rtcMaxPort = ${workerSettings.rtcMaxPort}`);
 };
 
+
+
+/* Create a new Router for the room if it doesn't exist. */
+const get_router = async (sessionId) => {
+	if (!ms_router[sessionId]) {
+		console.log(`(join_stream_room) Creating new router for room ${sessionId}`);
+		ms_router[sessionId] = await ms_worker.createRouter({ mediaCodecs: ms_routerOptions.mediaCodecs });
+	}
+	return ms_router[sessionId];
+};
+
+/* Remove the Router for the room if it exists. */
+const remove_router = async (sessionId) => {
+	try {
+		if (!ms_router[sessionId]) {
+			return console.log(`(remove_router) Router for room ${sessionId} does not exist`);
+		}
+
+		await ms_router[sessionId].close();
+		delete ms_router[sessionId];
+		console.log(`(remove_router) Router for room ${sessionId} removed`);
+	} catch (error) {
+		console.error("Error removing router:", error);
+	}
+};
+
+/* 	This should eventually establish two transports for the client.
+	One for sending and one for receiving.
+*/
 const bind_mediasoup = (socket, sessionId, id) => {
+	// Shortened label for logging
 	let label = `SKT(${Math.random().toString(36).substring(7)})`;
 
+	// HELPER FUNCTIONS --------------------------------------------
+	// ? Placed here to reuse parent scope variables
+
+	/* Returns a boolean indicating whether the transport belongs to the client */
+	const transport_belongs_to_self = (transportId) => {
+		try {
+			// Validate that the transportID belongs to the socket client
+			const client = room.clients.get(id);
+			if (!client) {
+				console.error("Client not found");
+				callback({ error: "Client not found" });
+				return false;
+			}
+
+			if (client.transports && !client.transports.includes(transportId)) {
+				console.error("Client Transport ID does not match");
+				callback({ error: "Client Transport ID does not match" });
+				return true;
+			}
+		}
+		catch (error) {
+			console.error("Error:", error);
+		}
+		return false;
+	};
+
+	// EVENT HANDLERS ----------------------------------------------
+
+	/* Return the mediasoup Router RTP capabilities. */
+	socket.on("get_rtp_capabilities", (callback) => {
+		const rtpCapabilities = ms_router.rtpCapabilities;
+		callback({ rtpCapabilities });
+	});
+
+	/* Establish a connection to the room:
+	1. Create a new Router for the room if it doesn't exist.
+	2. Add the client to the room.
+	3. Return the client's ID and the Router's RTP capabilities along 
+		with the existing producer IDs.
+	*/
 	socket.on("join_stream_room", async (callback) => {
 		// Create a Router for the room if it doesn't exist
-		if (!ms_router[sessionId]) {
-			ms_router[sessionId] = await ms_worker.createRouter({ mediaCodecs: ms_routerOptions.mediaCodecs });
-		}
+		const router = await get_router(sessionId);
 
 		const room = get_room(sessionId);
 		room.clients.set(id, { socket });
@@ -122,62 +182,15 @@ const bind_mediasoup = (socket, sessionId, id) => {
 
 		callback({
 			id: id,
-			routerRtpCapabilities: ms_router[sessionId].rtpCapabilities,
+			routerRtpCapabilities: router.rtpCapabilities,
 			producerIds,
 		});
 	});
 
-	socket.on("connect_transport", async ({ transportId, dtlsParameters }, callback) => {
-		console.log(`${label}(tr=${transportId})\n\t -> Transport connected to room ${sessionId}`);
-		const transport = transports.get(transportId);
-		if (!transport) {
-			console.error("Transport not found");
-			return;
-		}
-		await transport.connect({ dtlsParameters });
-		callback();
-	});
-
-	socket.on("get_rtp_capabilities", (callback) => {
-		const rtpCapabilities = ms_router.rtpCapabilities;
-		callback({ rtpCapabilities });
-	});
-
-	socket.on("produce", async ({ transportId, kind, rtpParameters, appData }, callback) => {
-		console.log(`(produce) called by ${label}(tr=${transportId})`);
-		const room = get_room(sessionId);
-		const transport = transports.get(transportId);
-		
-		if (!transport) {
-			console.error("Transport not found");
-			callback({ error: "Transport not found" });
-			return;
-		}
-
-
-		console.log("Producer Sent App Data:", appData);
-		const producer = await transport.produce({ kind, rtpParameters, appData: {...appData, id}});
-		room.producers.push(producer);
-		const client = room.clients.get(id)
-		if (client) {
-			client["producer"] = producer.id;
-		}
-		rooms.set(sessionId, room);
-		
-		console.log("APPPPP", producer.appData)
-		socket.to(sessionId).emit("new_producer", {
-			params: producer.rtpParameters,
-			producerId: producer.id,
-			kind,
-			appData: producer.appData
-		});
-
-		callback({ id: producer.id });
-	});
-
-	/* Media Soup Internal */
+	/* Create a WebRTCTransport  */
 	socket.on("create_transport", async (callback) => {
-		const transport = await createWebRtcTransport(ms_router);
+		const router = await get_router(sessionId);
+		const transport = await createWebRtcTransport(sessionId, id, router);
 		const transport_callback_data = {
 			id: transport.id,
 			iceParameters: transport.iceParameters,
@@ -188,11 +201,78 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		callback(transport_callback_data);
 	});
 
+	/* Establish a DTLS connection between client and server.*/
+	socket.on("connect_transport", async ({ transportId, dtlsParameters }, callback) => {
+		if (!transport_belongs_to_self(transportId)) {
+			console.error("Transport does not belong to client");
+			callback({ error: "Transport does not belong to client" });
+			return;
+		}
+
+		console.log(`${label}(tr=${transportId})\n\t -> Transport connected to room ${sessionId}`);
+		const transport = transports.get(transportId);
+		if (!transport) {
+			console.error("Transport not found");
+			return;
+		}
+		await transport.connect({ dtlsParameters });
+		callback();
+	});
+
+	/* 	Produce a track to the room. Adds a producer entry into the room as well
+		as announces that a new producer has been created for clients to handle
+	*/
+	socket.on("produce", async ({ transportId, kind, rtpParameters, appData }, callback) => {
+		console.log(`(produce) called by ${label}(tr=${transportId})`);
+		const room = get_room(sessionId);
+		const transport = transports.get(transportId);
+
+		if (!transport) {
+			console.error("Transport not found");
+			callback({ error: "Transport not found" });
+			return;
+		}
+		
+		if (!transport_belongs_to_self(transportId)) {
+			console.error("Transport does not belong to client");
+			callback({ error: "Transport does not belong to client" });
+			return;
+		}
+
+		const payload = {
+			kind, 
+			rtpParameters, 
+			appData: { ...appData, id }
+		}
+
+		const producer = await transport.produce(payload);
+
+		// Add the producer to the room
+		room.producers.push(producer);
+		const client = room.clients.get(id);
+		if (client) {
+			client["producer"] = producer.id;
+		}
+		rooms.set(sessionId, room);
+
+		// Announce the new producer to all clients in the room
+		socket.to(sessionId).emit("new_producer", {
+			params: producer.rtpParameters,
+			producerId: producer.id,
+			kind,
+			appData: producer.appData,
+		});
+
+		callback({ id: producer.id });
+	});
+
+
+	/* Create a consumer for a given producer  */
 	socket.on("consume", async ({ transportId, producerId, rtpCapabilities }, callback) => {
 		const room = get_room(sessionId);
 		const transport = transports.get(transportId);
 		const producerTransport = room.producers.find((p) => p.id === producerId);
-		
+
 		if (!transport) {
 			console.error("Transport not found");
 			callback({ error: "Transport not found" });
@@ -205,14 +285,26 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			return;
 		}
 
+		if (!transport_belongs_to_self(transportId)) {
+			console.error("Transport does not belong to client");
+			callback({ error: "Transport does not belong to client" });
+			return;
+		}
+
 		console.log(`(consume) called by ${label}(tr=${transport.id})`);
-		const router = ms_router;
+		const router = await get_router(sessionId);
+
+		if (!router) {
+			console.error("Router not found");
+			callback({ error: "Router not found" });
+			return;
+		}
 
 		if (!router.canConsume({ producerId, rtpCapabilities })) {
 			console.log("Cannot Consume");
 			return callback({ error: "Cannot consume" });
 		}
-		
+
 		const consumer = await transport.consume({
 			producerId,
 			rtpCapabilities,
@@ -220,7 +312,6 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		});
 
 		room.consumers.push(consumer);
-		const client = room.clients.get(id)
 		if (client) {
 			client["consumer"] = consumer.id;
 		}
@@ -252,9 +343,11 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		}
 		await consumer.resume();
 	});
+
+	/* Host and client perms */
 };
 
-const createWebRtcTransport = async (router) => {
+const createWebRtcTransport = async (sessionId, id, router) => {
 	const transport = await router.createWebRtcTransport({
 		listenIps: [
 			{ ip: "0.0.0.0", announcedIp: "127.0.0.1" },
@@ -265,12 +358,14 @@ const createWebRtcTransport = async (router) => {
 		enableTcp: true,
 		preferUdp: true,
 	});
-
+	
 	transports.set(transport.id, transport);
 	
 	transport.on("dtlsstatechange", (dtlsState) => {
 		if (dtlsState === "closed") {
 			transport.close();
+			// Remove from transports
+			transports.delete(transport.id);
 		}
 	});
 
@@ -281,6 +376,18 @@ const createWebRtcTransport = async (router) => {
 	transport.on("connectionstatechange", (state) => {
 		console.log("Transport state:", state); // Should eventually be "connected"
 	});
+
+	// Add transport to client
+	const room = get_room(sessionId);
+	const client = room.clients.get(id);
+	if (client) {
+		if (client["transports"]) {
+			client["transports"].push(transport.id);
+		} else {
+			client["transports"] = [transport.id];
+		}
+	}
+	rooms.set(sessionId, room);
 
 	return transport;
 };

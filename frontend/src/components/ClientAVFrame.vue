@@ -16,24 +16,27 @@ const props = defineProps<{
         audioSource: string;
         videoSource: string;
         stream: MediaStream;
+        isLocal?: boolean;
     }
     socket: Ref<Socket | null>;
 }>();
 
-console.log(props.data.stream);
 const isMyself = computed(() => {
-    return userdata.username === props.data.username
+    if (!props.data.isLocal) {
+        return false
+    }
+    return true
 })
 
 function toggleMute() {
     isMuted.value = !isMuted.value
 
     if (isMuted.value) {
-        stream.getAudioTracks().forEach((track) => {
+        props.data.stream.getAudioTracks().forEach((track) => {
             track.enabled = false;
         });
     } else {
-        stream.getAudioTracks().forEach((track) => {
+        props.data.stream.getAudioTracks().forEach((track) => {
             track.enabled = true;
         });
     }
@@ -43,11 +46,11 @@ function toggleVideo() {
     isVideoOff.value = !isVideoOff.value
 
     if (isVideoOff.value) {
-        stream.getVideoTracks().forEach((track) => {
+        props.data.stream.getVideoTracks().forEach((track) => {
             track.enabled = false;
         });
     } else {
-        stream.getVideoTracks().forEach((track) => {
+        props.data.stream.getVideoTracks().forEach((track) => {
             track.enabled = true;
         });
     }
@@ -56,20 +59,13 @@ function toggleVideo() {
 
 const video = ref<HTMLVideoElement | null>(null);
 
-watch(() => props.datastream, (newStream) => {
+watch(() => props.data.stream, (newStream) => {
     if (video.value) {
         video.value.srcObject = newStream;
     }
 })
 // Mounted
 onMounted(async () => {
-
-    if (isMyself.value) {
-        console.log("Loading my stream");
-    } else {
-        // sourceSelected(props.data.audioSource, props.data.videoSource);
-    }
-
     if (video.value) {
         video.value.srcObject = props.data.stream;
     }
@@ -86,7 +82,7 @@ onMounted(async () => {
             <video ref="video" class="w-full h-full top-0 absolute left-0 rounded-lg scale-110 " autoplay></video>
         </div>
         <h3 class="font-semibold absolute top-2 left-2   bg-black/50 backdrop -blur-sm px-2" v-text="props.data.username" ></h3 class="font-semibold">
-        <div class="flex items-center justify-center gap-2 relative z-[100] bg-black p-2" v-if="isMyself && video && video.value">
+        <div class="flex items-center justify-center gap-2 relative z-[100] bg-black p-2" v-if="isMyself">
             <button :class="['btn', 'w-12', {'bg-slate-500': !isMuted,  'bg-red-900': isMuted}]" :onclick="toggleMute" >
                 <v-icon v-if="isMuted" class="text-red-400 " name="bi-mic-mute-fill"/>
                 <v-icon v-else name="bi-mic-fill"/>
