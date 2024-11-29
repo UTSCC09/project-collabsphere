@@ -6,7 +6,7 @@ export const useUserdataStore = defineStore('userdata', () => {
   const isLoggedIn = ref(false)
   const username = ref('')
   const useremail = ref('')
-
+  
   const sessionID = ref('')
   const isHost = ref(false)
 
@@ -24,8 +24,10 @@ export const useUserdataStore = defineStore('userdata', () => {
       useremail.value = ''
       sessionID.value = ''
       isHost.value = false
-
+      
       clearLocalStorage()
+    }).finally(() => {
+      window.location.reload()
     });
   }
 
@@ -43,7 +45,7 @@ export const useUserdataStore = defineStore('userdata', () => {
     isHost.value = true
     sessionID.value = sessionId
     saveToLocalStorage()
-
+    
   }
 
   const joinSession = (sessionId: string) => {
@@ -84,7 +86,7 @@ export const useUserdataStore = defineStore('userdata', () => {
         isLoggedIn.value = true
       }
     }
-  }
+  } 
 
   const clearLocalStorage = () => {
     localStorage.removeItem('userdata')
