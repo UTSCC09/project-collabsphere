@@ -212,6 +212,8 @@ function bindConsumer(producerData) {
   if (appData) {
     client_username = appData.username || "unknown"
   }
+
+
   console.log(params, "Appdata", appData)
   console.log("CONSUMER", client_username)
   // Check if producer already exists
@@ -231,8 +233,6 @@ function bindConsumer(producerData) {
           console.log('Error consuming', error)
           return reject(Error(`Cannot consume`))
         }
-
-        console.log(params.appData)
 
         const kind = params.kind
 
@@ -258,7 +258,7 @@ function bindConsumer(producerData) {
         console.log('Consumer', consumer)        
 
         addClientStream({
-          id: params.id,
+          id: appData.id,
           username: client_username,
           audio: kind === 'audio',
           video: kind === 'video',
@@ -312,7 +312,7 @@ async function initializeStreams(data, hasMedia = true) {
     const passable_data = {
       ...media_configs,
       track: videoTrack,
-      appData: { username}
+      appData: { username }
     }
 
     const prod_trans = await producerTransport.produce(passable_data)
@@ -424,19 +424,16 @@ async function setupMedia(_socket: Socket, _username: string) {
   socket?.emit('join_stream_room', async (params) =>{
     await initializeStreams(params, hasMedia)
 
-    if (myProducerId) {
       addClientStream({
-        id: myProducerId,
+        id: params.id,
         username: 'You',
         audio: true,
         video: true,
         stream: local_stream,
       })
-    }
   })
 
   socket?.on("remove_client", (id) => {
-    console.log("Client removed", id)
     removeClientStream(id)
   })
   
@@ -448,8 +445,14 @@ function addClientStream(data: ClientStreamData) {
 
 function removeClientStream(id: string) {
   const index = clientConfigData.value.findIndex(data => data.id === id)
+  console.log("Client ID", id)
+  console.log(clientConfigData.value)
   if (index !== -1) {
     clientConfigData.value.splice(index, 1)
+    console.log("Client removed", id)
+
+  } else {
+    console.error('Client stream not found')
   }
 }
 

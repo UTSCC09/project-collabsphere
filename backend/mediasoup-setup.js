@@ -121,6 +121,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		});
 
 		callback({
+			id: id,
 			routerRtpCapabilities: ms_router[sessionId].rtpCapabilities,
 			producerIds,
 		});
@@ -153,8 +154,9 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			return;
 		}
 
+
 		console.log("Producer Sent App Data:", appData);
-		const producer = await transport.produce({ kind, rtpParameters, appData});
+		const producer = await transport.produce({ kind, rtpParameters, appData: {...appData, id}});
 		room.producers.push(producer);
 		const client = room.clients.get(id)
 		if (client) {
@@ -162,6 +164,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		}
 		rooms.set(sessionId, room);
 		
+		console.log("APPPPP", producer.appData)
 		socket.to(sessionId).emit("new_producer", {
 			params: producer.rtpParameters,
 			producerId: producer.id,
