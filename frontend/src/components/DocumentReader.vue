@@ -58,6 +58,8 @@ async function run(): Promise<void> {
   await viewer.openPdfAsync(props.file);
 
   // TODO change random connection to host
+  // TODO technically a race condition but unlikely to ever be a problem
+    // e.g. this code is reached before the connection is established
   // choose a random connection and ask for the annotations
   if (props.conns[0]) {
     props.conns[0].send({request: "annotations"});

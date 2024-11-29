@@ -3,10 +3,6 @@ import { onMounted, ref, Ref } from "vue";
 
 const props = defineProps({
   socket: Object,
-  conns: {
-    type: Object,
-    required: true,
-  }
 });
 
 const note: Ref<string | null> = ref(null);
@@ -14,11 +10,6 @@ onMounted(() => {
   props.socket.on('note', (data: string) => {
     note.value = data;
   });
-
-  // TODO change random connection to host
-  // choose a random connection and ask for the annotations
-  if (props.conns[0])
-    props.conns[0].send({request: "notes"});
 });
 
 function transmit() {

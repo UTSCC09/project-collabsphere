@@ -74,6 +74,54 @@ onBeforeMount(() => {
   socket.on('connect_error', (err) => {
     console.error('Socket.IO connection error:', err);
   });
+
+  peer_init();
+
+  // when a user connects to this session, create a new connection
+  // and initialize it.
+  socket.on("user_connection", (id) => {
+    console.log("Another user connected to the session.");
+    const conn = peer.connect(id);
+    conn.on("open", () => {
+      connection_init(conn);
+      otherUsers.set(conn.peer, {conn: conn});
+      // send your username to the other user
+      conn.send({username: username.value});
+
+      // send file if it exists and current user is the host
+      // TODO isHost is not actually implemented (isHost.value would work)
+        // otherwise if the host refreshes, the session is cleared
+        // maybe set another user as host or leave as currently is
+      if (isHost) {
+        if (file.value) {
+          const fileReader = new FileReader();
+          fileReader.onload = async () => {
+            conn.send({file: fileReader.result});
+          }
+          fileReader.readAsArrayBuffer(file.value);
+        }
+        // send notes
+        sharedNotesRef.value.transmit();
+      }
+    });
+  });
+
+  // when a user leaves this session, remove their cursor
+  socket.on("user_disconnection", (id) => {
+    const index = conns.indexOf(otherUsers.get(id).conn);
+    otherUsers.delete(id);
+
+    if (index !== -1) {
+      conns.splice(index, 1);
+
+      for (let i = 0; i < cursors.value.length; i++) {
+        if (cursors.value[i].id === id) {
+          cursorIds.splice(cursorIds.indexOf(id), 1);
+          cursors.value.splice(i, 1);
+        }
+      }
+    }
+  });
 });
 
 // modified from https://stackoverflow.com/questions/30738079/webrtc-peerjs-text-chat-connect-to-multiple-peerid-at-the-same-time
@@ -120,8 +168,6 @@ function connection_init(conn: Peer) {
     if (data.request) {
       if (data.request === "annotations")
         documentReaderRef.value.sendAnnotationsTo(conn);
-      else if (data.request === "notes")
-        sharedNotesRef.value.transmit();
     }
   });
 
@@ -149,46 +195,6 @@ function peer_init() {
 
 onMounted(() => {
   mounted.value = true;
-  peer_init();
-
-  // when a user connects to this session, create a new connection
-  // and initialize it.
-  socket.on("user_connection", (id) => {
-    console.log("Another user connected to the session.");
-    const conn = peer.connect(id);
-    conn.on("open", () => {
-      connection_init(conn);
-      otherUsers.set(conn.peer, {conn: conn});
-      // send your username to the other user
-      conn.send({username: username.value});
-
-      // send file if it exists and current user is the host
-      if (file.value && isHost) {
-        const fileReader = new FileReader();
-        fileReader.onload = async () => {
-          conn.send({file: fileReader.result});
-        }
-        fileReader.readAsArrayBuffer(file.value);
-      }
-    });
-  });
-
-  // when a user leaves this session, remove their cursor
-  socket.on("user_disconnection", (id) => {
-    const index = conns.indexOf(otherUsers.get(id).conn);
-    otherUsers.delete(id);
-
-    if (index !== -1) {
-      conns.splice(index, 1);
-
-      for (let i = 0; i < cursors.value.length; i++) {
-        if (cursors.value[i].id === id) {
-          cursorIds.splice(cursorIds.indexOf(id), 1);
-          cursors.value.splice(i, 1);
-        }
-      }
-    }
-  });
 
   // when mouse is moved, broadcast mouse position to all connections
   function sendCursor(
