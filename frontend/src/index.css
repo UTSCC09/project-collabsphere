@@ -11,6 +11,13 @@ body {
     overflow: hidden;
 }
 
+#app {
+    min-width: 100vw;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
 @layer utilities {
     .main-bg-color {
         @apply bg-cyan-700
@@ -43,3 +50,20 @@ body {
     }
 }
 
+
+
+/* Animated fade in */
+.notif-enter {
+    animation: fadeIn 0.5s;
+}
+
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}

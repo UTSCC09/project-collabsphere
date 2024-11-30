@@ -3,6 +3,9 @@ import { computed, ref } from 'vue';
 import LoginItem from '../components/LoginItem.vue'
 import { useUserdataStore } from '@/stores/userdata';
 import { useRouter } from 'vue-router';
+// @ts-ignore
+import fetchWrapper from '@/utils/fetchWrapper';
+
 const userstore = useUserdataStore()
 
 const isLoggedIn = computed(() => userstore.isLoggedIn)
@@ -10,7 +13,7 @@ const isLoggedIn = computed(() => userstore.isLoggedIn)
 const router = useRouter()
 
 function createSession() {
-  fetch(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session`,
+  fetchWrapper(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session`,
     {
       credentials: 'include',
       method: 'GET',
@@ -19,13 +22,11 @@ function createSession() {
       },
     }
   )
-    .then(res => res.json())
-    .then(data => {
-      console.log(data)
+  .then((data: {sessionId: string}) => {
       userstore.hostSession(data.sessionId)
       // Jump to session view
       router.push('/session')
-    })
+    }).catch(() => {})
 }
 
 const sessionID = ref('')
@@ -33,7 +34,7 @@ const sessionID_error = ref('')
 
 function joinSession() {
   sessionID_error.value = ''
-  fetch(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}`,
+  fetchWrapper(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}`,
     {
       credentials: 'include',
       method: 'GET',
@@ -41,9 +42,7 @@ function joinSession() {
         'Content-Type': 'application/json',
       },
     }
-  )
-    .then(res => res.json())
-    .then(data => {
+  ).then((data: {session: {_id: string}}) => {
       if (!data.session || !data.session._id) {
         sessionID_error.value = 'Session not found'
         return
@@ -52,7 +51,7 @@ function joinSession() {
       userstore.joinSession(data.session._id)
       // Jump to session view
       router.push('/session')
-    })
+    }).catch(() => {})
 }
 
 
@@ -63,7 +62,7 @@ function joinSession() {
     <h1>You need an account to enjoy CollabSphere</h1>
     <LoginItem />
   </main>
-  <main v-else class="flex w-full lg:w-1/3 h-full ml-auto mr-auto items-center justify-center text-center">
+  <main v-else class="flex w-full lg:w-1/3 flex-1 ml-auto mr-auto items-center justify-center text-center">
     <div class="gap-2 flex flex-col">
     <h1 class="text-2xl font-bold">Collaborate</h1>
     <p class="text-xl">Host your own session or join a friend!</p>
