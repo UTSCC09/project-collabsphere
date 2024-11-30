@@ -118,7 +118,6 @@ const remove_router = async (sessionId) => {
 const bind_mediasoup = (socket, sessionId, id) => {
 	// Shortened label for logging
 	let label = `SKT(${Math.random().toString(36).substring(7)})`;
-
 	// HELPER FUNCTIONS --------------------------------------------
 	// ? Placed here to reuse parent scope variables
 
@@ -232,7 +231,25 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		return transport;
 	};
 
+	const get_producer_ids = (room) => {
+		const producerIds = room.producers.map((producer) => {
+			return {
+				id: producer.id,
+				kind: producer.kind,
+				producerId: producer.id,
+				appData: producer.appData,
+			};
+		});
+		return producerIds;
+	};
+
 	// EVENT HANDLERS ----------------------------------------------
+
+	socket.on("get_producer_ids", (callback) => {
+		const room = get_room(sessionId);
+		const producerIds = get_producer_ids(room);
+		callback({ producerIds });
+	});
 
 	/* Return the mediasoup Router RTP capabilities. */
 	socket.on("get_rtp_capabilities", (callback) => {
@@ -247,6 +264,8 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		with the existing producer IDs.
 	*/
 	socket.on("join_stream_room", async (callback) => {
+		console.log(`(join_stream_room) Client ${id} joined room ${sessionId}`);
+
 		// Create a Router for the room if it doesn't exist
 		const router = await get_router(sessionId);
 
@@ -255,20 +274,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		room.clients.set(id, client);
 		rooms.set(sessionId, room);
 
-		console.log(`(join_stream_room) Client ${id} joined room ${sessionId}`);
-
-		const producerIds = room.producers.map((producer) => {
-			return {
-				id: producer.id,
-				producerId: producer.id,
-				params: {
-					id: producer.id,
-					kind: producer.kind,
-					rtpParameters: producer.rtpParameters,
-				},
-				appData: producer.appData,
-			};
-		});
+		const producerIds = get_producer_ids(room);
 
 		callback({
 			id: id,
@@ -329,13 +335,20 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			return;
 		}
 
+		appData.paused = true;
+
 		const payload = {
 			kind,
 			rtpParameters,
-			appData: { ...appData, id },
+			appData: {
+				...appData,
+				id,
+			},
 		};
 
 		const producer = await transport.produce(payload);
+
+		producer.pause();
 
 		// Add the producer to the room
 		room.producers.push(producer);
@@ -348,6 +361,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 				client["video_producer"] = producer.id;
 			}
 		}
+
 		rooms.set(sessionId, room);
 
 		// Announce the new producer to all clients in the room
@@ -402,7 +416,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		const consumer = await transport.consume({
 			producerId,
 			rtpCapabilities,
-			paused: false,
+			pause: false,
 		});
 
 		room.consumers.push(consumer);
@@ -411,12 +425,13 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			client["consumer"] = consumer.id;
 		}
 		rooms.set(sessionId, room);
-
 		const params = {
 			id: consumer.id,
 			producerId: producerId,
 			kind: consumer.kind,
-			appData: producerTransport.appData,
+			appData: {
+				...producerTransport.appData,
+			},
 
 			rtpParameters: consumer.rtpParameters,
 			iceParameters: transport.iceParameters,
@@ -479,6 +494,8 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			return;
 		}
 
+		producer.appData.paused = true;
+
 		producer.pause();
 		socket.to(sessionId).emit("producer-paused", { clientId, producerId, kind });
 		callback();
@@ -501,6 +518,8 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			callback({ error: "Not host or transport owner" });
 			return;
 		}
+
+		producer.appData.paused = false;
 
 		producer.resume();
 		socket.to(sessionId).emit("producer-resumed", { clientId, producerId, kind });
@@ -555,6 +574,15 @@ const client_disconnect = (sessionId, id) => {
 		consumer.close();
 		room.consumers = room.consumers.filter((c) => c.id !== consumerId);
 	}
+
+	// Get all transports associated with the client
+	const client_transports = client.transports;
+
+	client_transports.forEach((transportId) => {
+		const transport = transports.get(transportId);
+		transport.close();
+		transports.delete(transportId);
+	});
 
 	delete room.clients[id];
 

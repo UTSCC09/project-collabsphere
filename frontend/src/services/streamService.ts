@@ -10,7 +10,7 @@ Process is as follows:
 7. Connect receiver transport
 
 */
-const PRINT_DEBUG = true
+const PRINT_DEBUG = false
 const log = (...args: any) => {
   if (PRINT_DEBUG) {
     console.log(...args)
@@ -47,6 +47,7 @@ import { ref, toRaw, type Ref } from 'vue'
 import { Socket } from 'socket.io-client'
 import type { ClientStreamData } from '@/components/ClientAVFrame.vue'
 
+let myStreamID: string
 let myVideoProducerID: string
 let myAudioProducerID: string
 let username = 'unknown'
@@ -172,10 +173,12 @@ const getDevice = async (
 }
 
 function bindConsumer(producerData) {
-  const { producerId, params, appData } = producerData
+  const { producerId, kind, appData } = producerData
   let client_username = 'unknown'
+  let paused = true
   if (appData) {
     client_username = appData.username || 'unknown'
+    paused = appData.paused || false
   }
 
   // Check if producer already exists
@@ -199,17 +202,12 @@ function bindConsumer(producerData) {
           return reject(Error(`Cannot consume`))
         }
 
-        const kind = params.kind
         const consumer = await consumerTransport?.consume({
           id: params.id,
           producerId: params.producerId,
           kind: params.kind,
           rtpParameters: params.rtpParameters,
         })
-
-        if (consumer.paused) {
-          await consumer.resume()
-        }
 
         // Check tracks exist
         if (!consumer.track) {
@@ -219,13 +217,15 @@ function bindConsumer(producerData) {
 
         log('8. Retrieving consumer')
 
-        addClientStream({
+        const stream_data: ClientStreamData = {
           id: appData.id,
           producerId: producerId,
           username: client_username,
           stream: new MediaStream([consumer.track]),
           socket: socket,
-        })
+        }
+
+        addClientStream(stream_data, paused, kind)
 
         socket?.emit('consumer-resume', { consumerId: params.id })
         resolve(1)
@@ -321,7 +321,11 @@ async function initializeStreams(
     await bindConsumer(producerData)
   })
 
-  console.log('Producer IDs:', myVideoProducerID, myAudioProducerID)
+  // Get producer ids
+  socket?.emit('get_producer_ids', ({ producerIds }) => {
+    bindExistingConsumers(producerIds)
+  })
+
   return { myVideoProducerID, myAudioProducerID }
 }
 
@@ -378,7 +382,6 @@ async function bindStreamEventHandlers(socket: Socket) {
   socket.on('producer-paused', async ({ clientId, producerId, kind }) => {
     log('Producer paused', clientId)
     const producer = clientConfigData.value.get(clientId)
-    console.log(clientConfigData.value)
     if (!producer) {
       console.error('Producer not found')
       return
@@ -419,36 +422,33 @@ async function setupMedia(_socket: Socket, _username: string) {
 
   // Retrieve a local stream
   let hasMedia = await checkHasMedia()
-  const local_stream = await retrieveLocalStream()
-  if (!local_stream) {
-    return console.error('No stream found')
-  }
-
-  // Fetch RTP Capabilities
-  const { rtpCapabilities } = await new Promise(resolve => {
-    socket?.emit('get_rtp_capabilities', resolve)
-  })
-
-  if (!rtpCapabilities) {
-    return console.error('No router RTP capabilities found')
-  }
-
-  log('RTP Capabilities', rtpCapabilities)
-  // Create a mediasoup Device
-  const device = await getDevice(rtpCapabilities)
-  if (!device) {
-    return console.error('No device found')
+  if (!hasMedia) {
+    console.error('No media found')
+    return
   }
 
   // Initialize streams
-  socket?.emit('join_stream_room', async params => {
-    const { producerIds } = params
-    bindExistingConsumers(producerIds)
+  _socket.emit('join_stream_room', async params => {
+    // Fetch RTP Capabilities
+    const { rtpCapabilities } = await new Promise(resolve => {
+      _socket.emit('get_rtp_capabilities', data => {
+        resolve(data)
+      })
+    })
 
-    async function joinCall() {
-      if (!device) {
-        console.error('No device found')
-        return
+    if (!rtpCapabilities) {
+      return console.error('No router RTP capabilities found')
+    }
+
+    // Create a mediasoup Device
+    const device = await getDevice(rtpCapabilities)
+    if (!device) return console.error('No device found')
+
+    // Close tracks for now
+    async function joinCall(params) {
+      let local_stream = await retrieveLocalStream()
+      if (!local_stream) {
+        return console.error('No stream found')
       }
 
       // Create a producer transport (automatically connects)
@@ -475,37 +475,70 @@ async function setupMedia(_socket: Socket, _username: string) {
 
       myConfigs.producerId = myVideoProducerID
       myConfigs.audioProducerId = myAudioProducerID
-
+      myConfigs.videoDisabled = true
+      myConfigs.audioDisabled = true
       if (local_stream) myConfigs.stream = local_stream
       myConfigs.connected = true
       myConfigs.joinCall = () => {}
     }
 
+    myStreamID = params.id
+
     addClientStream({
-      id: params.id,
+      id: myStreamID,
       producerId: 'pending',
       username: 'You',
       stream: new MediaStream(),
       isLocal: true,
       socket: socket,
-      joinCall: joinCall,
+      videoDisabled: true,
+      audioDisabled: true,
+      joinCall: () => {
+        joinCall(params)
+      },
+      toggleMute: toggleMute,
+      toggleVideo: toggleVideo,
     })
   })
 
   socket?.on('remove_client', id => {
+    log('Removing client', id)
     removeClientStream(id)
   })
 
   bindStreamEventHandlers(socket)
 }
 
-function addClientStream(data: ClientStreamData) {
+function toggleMute() {
+  const myConfigs = clientConfigData.value.get(myStreamID)
+  if (!myConfigs) {
+    console.error('No client configs')
+    return
+  }
+
+  myConfigs.audioDisabled = !myConfigs.audioDisabled
+}
+
+function toggleVideo() {
+  const myConfigs = clientConfigData.value.get(myStreamID)
+  if (!myConfigs) {
+    console.error('No client configs')
+    return
+  }
+
+  myConfigs.videoDisabled = !myConfigs.videoDisabled
+}
+
+function addClientStream(
+  data: ClientStreamData,
+  paused = false,
+  kind = 'video',
+) {
   if (data.id == null) {
     console.error('Client stream ID is null')
     return
   }
 
-  const kind = data.stream.getVideoTracks().length ? 'video' : 'audio'
   const clientStream = clientConfigData.value.get(data.id)
 
   // Check if client stream already
@@ -515,12 +548,16 @@ function addClientStream(data: ClientStreamData) {
 
     if (kind == 'video' && !hasVideo) {
       clientStream.stream.addTrack(data.stream.getVideoTracks()[0])
-      data.producerId = myVideoProducerID
+      clientStream.producerId = data.producerId
+      clientStream.videoDisabled = paused
+      clientConfigData.value.set(data.id, clientStream)
     }
 
     if (kind == 'audio' && !hasAudio) {
       clientStream.stream.addTrack(data.stream.getAudioTracks()[0])
-      data.audioProducerId = myAudioProducerID
+      clientStream.audioProducerId = data.producerId
+      clientStream.audioDisabled = paused
+      clientConfigData.value.set(data.id, clientStream)
     }
 
     return
@@ -528,19 +565,50 @@ function addClientStream(data: ClientStreamData) {
 
   // If is audio, set producer ID to audio producer ID
   if (kind == 'audio') {
-    data.audioProducerId = myAudioProducerID
+    data.audioProducerId = data.producerId
+    data.audioDisabled = paused
+  } else {
+    data.videoDisabled = paused
   }
 
   clientConfigData.value.set(data.id, data)
 }
 
 function removeClientStream(id: string) {
-  if (!clientConfigData.value.has(id)) {
-    console.error('Client stream not found')
-    return
-  }
+  // Stop tracks
+  const clientStream = clientConfigData.value.get(id)
+  if (!clientStream) return
+
+  clientStream.stream.getTracks().forEach(track => track.stop())
 
   clientConfigData.value.delete(id)
 }
 
-export { setupMedia, removeClientStream, addClientStream, clientConfigData }
+function onDisconnect() {
+  device.value = null
+  consumerTransport.value = null
+  producerTransport.value = null
+
+  producers = {}
+
+  for (const [key, data] of clientConfigData.value.entries()) {
+    removeClientStream(key)
+  }
+
+  // Get local stream and close it
+  navigator.mediaDevices
+    .getUserMedia({ video: true, audio: true })
+    .then(stream => {
+      stream.getTracks().forEach(track => track.stop())
+    })
+
+  clientConfigData.value.clear()
+}
+
+export {
+  onDisconnect,
+  setupMedia,
+  removeClientStream,
+  addClientStream,
+  clientConfigData,
+}

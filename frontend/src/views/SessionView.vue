@@ -1,5 +1,5 @@
 <script setup lang="ts" type="module">
-import {computed, onMounted, ref, type Ref, type Component, onBeforeUnmount, onBeforeMount} from "vue";
+import {computed, onMounted, ref, type Ref, type Component, onBeforeUnmount, onBeforeMount, watch} from "vue";
 import { Peer } from "https://esm.sh/peerjs@1.5.4?bundle-deps"
 import { throttle } from 'throttle-debounce';
 import { io, Socket } from "socket.io-client";
@@ -9,7 +9,7 @@ import { useUserdataStore } from "@/stores/userdata";
 import SharedNote from "@/components/SharedNote.vue";
 import ClientAVFrame from '../components/ClientAVFrame.vue'
 import { MdCollectionsOutlined } from "oh-vue-icons/icons";
-import { addClientStream, removeClientStream, setupMedia, clientConfigData } from "@/services/streamService";
+import { onDisconnect, removeClientStream, setupMedia, clientConfigData } from "@/services/streamService";
 // true if user is host
 const isHost = computed(() => {
   return useUserdataStore().isHost;
@@ -70,6 +70,7 @@ onBeforeMount(() => {
 
   socket.on('connect', () => {
     console.log('Socket.IO connected with ID:', socket.id);
+    
   });
 
   socket.on('connect_error', (err) => {
@@ -129,6 +130,7 @@ function peer_init() {
   peer.on("open", (id: string) => {
     console.log("Joining session.", sessionID.value, id, username.value);
     socket.emit("join_session", sessionID.value, id);
+    setupMedia(socket, username.value);
   });
 
   // when a user connects with you, initialize the connection
@@ -235,18 +237,18 @@ const isFile = computed(() => {
 });
 
 onBeforeUnmount(() => {
-  if (socket) socket.disconnect();
-});
-
-onMounted(() => {
-  setupMedia(socket, username.value);
+  if (socket) {
+    onDisconnect(socket);
+    
+    socket.disconnect();
+  }
 });
 
 </script>
 
 <template>
   <div>
-    <h1 class="ml-2"><v-icon name='fa-users' class="scale-105"/> <span v-text="clientConfigData.length"/> Connected </h1>
+    <h1 class="ml-2"><v-icon name='fa-users' class="scale-105"/> <span v-text="1 + otherUsers.size"/> Connected </h1>
     <CursorItem v-for="cursor in cursors" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" style="z-index:100"/>
     <hr class="my-3" />
     <div class="flex">

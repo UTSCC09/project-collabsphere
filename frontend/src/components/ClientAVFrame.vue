@@ -4,22 +4,19 @@ import type { Socket } from 'socket.io-client'
 import ClientAVMenu from './ClientAVMenu.vue'
 import { useUserdataStore } from '@/stores/userdata';
 
-const userdata = useUserdataStore();
-
-const isMuted = ref(false)
-const isVideoOff = ref(false)
-
 export interface ClientStreamData {
   id: string
   producerId: string
   audioProducerId?: string
   username: string
-  audioDisabled?: boolean
-  videoDisabled?: boolean
+  audioDisabled: boolean
+  videoDisabled: boolean
   stream: MediaStream
   socket: Socket
   isLocal?: boolean
   joinCall?: (data: any) => void
+  toggleMute?: () => void
+  toggleVideo?: () => void
   connected?: boolean
 }
 
@@ -45,13 +42,11 @@ const createBlackFrame = () => {
 };
 
 function toggleMute() {
-    isMuted.value = !isMuted.value
+    if (props.data.toggleMute) {
+        props.data.toggleMute()
+    }
 
-    if (isMuted.value) {
-        props.data.stream.getAudioTracks().forEach((track) => {
-            track.enabled = false;
-        });
-
+    if (props.data.audioDisabled) {
         props.data.socket.emit('pause-producer', { 
             clientId: props.data.id,
             producerId: props.data.audioProducerId, 
@@ -59,9 +54,6 @@ function toggleMute() {
         }, (data)=>{})
 
     } else {
-        props.data.stream.getAudioTracks().forEach((track) => {
-            track.enabled = true;
-        });
 
         props.data.socket.emit('resume-producer', { 
             clientId: props.data.id,
@@ -72,14 +64,15 @@ function toggleMute() {
 }
 
 function toggleVideo() {
-    isVideoOff.value = !isVideoOff.value
+    if (props.data.toggleVideo) {
+        props.data.toggleVideo()
+    }
 
-    if (isVideoOff.value) {
+    if (props.data.videoDisabled) {
         props.data.stream.getVideoTracks().forEach((track) => {
             track.enabled = false;
         });
 
-        console.log('pausing video')
         props.data.socket.emit('pause-producer', { 
             clientId: props.data.id,
             producerId: props.data.producerId, 
@@ -100,14 +93,12 @@ function toggleVideo() {
 const video = ref<HTMLVideoElement | null>(null);
 
 watch(() => props.data.videoDisabled, (newVal) => {
-    isVideoOff.value = newVal || false
     props.data.stream.getVideoTracks().forEach((track) => {
-        track.enabled = !isVideoOff.value;
+        track.enabled = !props.data.videoDisabled;
     });
-
+    
     if (!video.value) return;
-
-    if (isVideoOff.value) {
+    if (props.data.videoDisabled) {
         const blackFrame = createBlackFrame();
         video.value.srcObject = new MediaStream([blackFrame]);
     } else {
@@ -116,15 +107,19 @@ watch(() => props.data.videoDisabled, (newVal) => {
 })
 
 watch(() => props.data.audioDisabled, (newVal) => {
-    isMuted.value = newVal || false
     props.data.stream.getAudioTracks().forEach((track) => {
-        track.enabled = !isMuted.value;
+        track.enabled = !props.data.audioDisabled;
     });
 })
 
 watch(() => props.data.stream, (newStream) => {
     if (video.value) {
         video.value.srcObject = newStream;
+
+        props.data.stream.getAudioTracks().forEach((track) => {
+            track.enabled = false;
+        });
+
     }
 })
 
@@ -132,6 +127,14 @@ watch(() => props.data.stream, (newStream) => {
 onMounted(async () => {
     if (video.value) {
         video.value.srcObject = props.data.stream;
+
+        props.data.stream.getAudioTracks().forEach((track) => {
+            track.enabled = !props.data.audioDisabled;
+        });
+
+        props.data.stream.getVideoTracks().forEach((track) => {
+            track.enabled = !props.data.videoDisabled;
+        });
     }
 })
 
@@ -145,13 +148,13 @@ onMounted(async () => {
         >
             Join Call
         </button>
-        <ClientAVMenu class="absolute z-[100] top-2 right-2"/>
+        <!-- <ClientAVMenu class="absolute z-[100] top-2 right-2"/> -->
 
-        <div class="absolute w-full h-full flex items-center justify-center gap-5">
+        <div class="absolute w-full h-full flex z-[50] items-center justify-center gap-5">
             
-            <v-icon v-if="isVideoOff" 
+            <v-icon v-if="props.data.videoDisabled" 
                 name="bi-camera-video-off-fill" 
-                class="z-[100] text-red-500 scale-150"/>
+                class=" text-red-500 scale-150"/>
 
         </div>
 
@@ -161,17 +164,17 @@ onMounted(async () => {
         </div>
         <div class="absolute top-2 left-2 w-full flex items-center">        
             <h3 class="font-semibold bg-black/50 backdrop w-fit -blur-sm px-2 select-none" v-text="props.data.username" ></h3 class="font-semibold">
-            <v-icon v-if="isMuted" name="bi-mic-mute-fill" 
+            <v-icon v-if="props.data.audioDisabled" name="bi-mic-mute-fill" 
                 class="z-[100] text-white bg-black/50"/>
         </div>
 
         <div class="flex items-center justify-center gap-2 relative z-[100] bg-black p-2" v-if="isMyself">
-            <button :class="['btn', 'w-12', {'bg-slate-500': !isMuted,  'bg-red-900': isMuted}]" :onclick="toggleMute" >
-                <v-icon v-if="isMuted" class="text-red-400 " name="bi-mic-mute-fill"/>
+            <button :class="['btn', 'w-12', {'bg-slate-500': !props.data.audioDisabled,  'bg-red-900': props.data.audioDisabled}]" :onclick="toggleMute" >
+                <v-icon v-if="props.data.audioDisabled" class="text-red-400 " name="bi-mic-mute-fill"/>
                 <v-icon v-else name="bi-mic-fill"/>
             </button>
-            <button :class="['btn', 'w-12', {'bg-slate-500': !isVideoOff, 'bg-red-900': isVideoOff}]" :onclick="toggleVideo">
-                <v-icon v-if="isVideoOff" class="text-red-400" name="bi-camera-video-off-fill"/>
+            <button :class="['btn', 'w-12', {'bg-slate-500': !props.data.videoDisabled, 'bg-red-900': props.data.videoDisabled}]" :onclick="toggleVideo">
+                <v-icon v-if="props.data.videoDisabled" class="text-red-400" name="bi-camera-video-off-fill"/>
                 <v-icon v-else name="bi-camera-video-fill"/>
             </button>
         </div>
