@@ -461,6 +461,7 @@ async function setupMedia(_socket: Socket, _username: string) {
       if (!local_stream) {
         return console.error('No stream found')
       }
+      bindStreamEventHandlers(socket)
 
       // Create a producer transport (automatically connects)
       await createSendTransport(device)
@@ -517,7 +518,6 @@ async function setupMedia(_socket: Socket, _username: string) {
     removeClientStream(id)
   })
 
-  bindStreamEventHandlers(socket)
 }
 
 /* Toggle mute: Used locally */
