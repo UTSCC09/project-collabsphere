@@ -132,7 +132,6 @@ const bind_mediasoup = (socket, sessionId, id) => {
 				return false;
 			}
 
-			console.log(client.transports.map((t) => t));
 			if (client.transports && !client.transports.includes(transportId)) {
 				console.error("Client Transport ID does not match");
 				callback({ error: "Client Transport ID does not match" });
@@ -155,20 +154,15 @@ const bind_mediasoup = (socket, sessionId, id) => {
 				return false;
 			}
 
-			console.log(client.video_producer, client.audio_producer, client.consumer);
-
 			if (client.video_producer && client.video_producer === transportId) {
-				console.log("Client Producer ID matches");
 				return true;
 			}
 
 			if (client.audio_producer && client.audio_producer === transportId) {
-				console.log("Client Producer ID matches");
 				return true;
 			}
 
 			if (client.consumer && client.consumer === transportId) {
-				console.log("Client Consumer ID matches");
 				return true;
 			}
 		} catch (error) {

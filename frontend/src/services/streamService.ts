@@ -17,6 +17,8 @@ const log = (...args: any) => {
   }
 }
 
+
+/* Media Configurations for produce */
 const media_configs = {
   encodings: [
     {
@@ -91,6 +93,7 @@ const createRecvTransport = async (device: mediasoup.types.Device) => {
   return newRecvTransport
 }
 
+/* Create a producer transport */
 const createSendTransport = async (device: mediasoup.types.Device) => {
   if (producerTransport.value != null) return toRaw(producerTransport.value)
 
@@ -143,6 +146,7 @@ const createSendTransport = async (device: mediasoup.types.Device) => {
   return newSendTransport
 }
 
+/* Get the device */
 const getDevice = async (
   routerRtpCapabilities = null,
 ): Promise<mediasoup.types.Device | null> => {
@@ -172,6 +176,7 @@ const getDevice = async (
   return null
 }
 
+/* Bind a consumer to a producer and then prepare it for display */
 function bindConsumer(producerData) {
   const { producerId, kind, appData } = producerData
   let client_username = 'unknown'
@@ -234,6 +239,7 @@ function bindConsumer(producerData) {
   })
 }
 
+/* Bind consumers for all existing producers */
 async function bindExistingConsumers(producerIds) {
   log("ProducerID's to consume:", producerIds)
   // Bind consumers for all existing producers
@@ -250,6 +256,8 @@ async function bindExistingConsumers(producerIds) {
   }
 }
 
+/*  Feed video and audio into producer transport.
+    Begin listening for new producers as well as existing producers */
 async function initializeStreams(
   data,
   hasMedia = true,
@@ -329,6 +337,7 @@ async function initializeStreams(
   return { myVideoProducerID, myAudioProducerID }
 }
 
+/* Retrieve local stream */
 async function retrieveLocalStream() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -378,6 +387,7 @@ async function checkHasMedia() {
   }
 }
 
+/* Bind stream event handlers */
 async function bindStreamEventHandlers(socket: Socket) {
   socket.on('producer-paused', async ({ clientId, producerId, kind }) => {
     log('Producer paused', clientId)
@@ -416,6 +426,7 @@ async function bindStreamEventHandlers(socket: Socket) {
   })
 }
 
+/* Initialize the process for establishing a connection to the SFU */
 async function setupMedia(_socket: Socket, _username: string) {
   socket = _socket
   username = _username
@@ -509,6 +520,7 @@ async function setupMedia(_socket: Socket, _username: string) {
   bindStreamEventHandlers(socket)
 }
 
+/* Toggle mute: Used locally */
 function toggleMute() {
   const myConfigs = clientConfigData.value.get(myStreamID)
   if (!myConfigs) {
@@ -519,6 +531,7 @@ function toggleMute() {
   myConfigs.audioDisabled = !myConfigs.audioDisabled
 }
 
+/* Toggle video: Used locally */
 function toggleVideo() {
   const myConfigs = clientConfigData.value.get(myStreamID)
   if (!myConfigs) {
@@ -529,6 +542,7 @@ function toggleVideo() {
   myConfigs.videoDisabled = !myConfigs.videoDisabled
 }
 
+/* Create a client stream or add a track to an existing one. */
 function addClientStream(
   data: ClientStreamData,
   paused = false,
@@ -574,6 +588,7 @@ function addClientStream(
   clientConfigData.value.set(data.id, data)
 }
 
+/* Remove a client stream */
 function removeClientStream(id: string) {
   // Stop tracks
   const clientStream = clientConfigData.value.get(id)
@@ -584,6 +599,7 @@ function removeClientStream(id: string) {
   clientConfigData.value.delete(id)
 }
 
+/* Disconnect from the SFU and reset states */
 function onDisconnect() {
   device.value = null
   consumerTransport.value = null
