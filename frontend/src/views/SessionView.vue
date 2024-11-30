@@ -283,6 +283,6 @@ onBeforeUnmount(() => {
 </template>
 <style scoped>
 #notes {
-  height: calc(87.5vh - 80px);
+  height: calc(93.5vh - 80px);
 }
 </style>

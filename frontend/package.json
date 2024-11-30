@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
@@ -14,6 +13,7 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@vueuse/core": "^12.0.0",
     "collabsphere": "file:",
     "oh-vue-icons": "^1.0.0-rc3",
     "pdf-lib": "^1.17.1",
