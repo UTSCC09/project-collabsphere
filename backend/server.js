@@ -132,8 +132,11 @@ io.on("connection", (socket) => {
 
     socket.on("host_application", async () => {
       const session = await Session.findById(sessionId);
-      if (!session.tempHost) {
+      // !session.tempHost only allows the first to respond (typically has best internet speed)
+      // !session.connId prevents a socket from emitting host_application while host exists
+      if (!session.tempHost && !session.connId) {
         session.tempHost = userId;
+        session.connId = id;
         await session.save();
         // io instead of socket so the host also receives the message
         io.emit("new_host", id);
@@ -149,6 +152,7 @@ io.on("connection", (socket) => {
         socket.to(sessionId).emit("host_left");
       } else if (userId === session.tempHost.toString()) {
         session.tempHost = "";
+        session.connId = "";
         await session.save();
         socket.to(sessionId).emit("host_left");
       }

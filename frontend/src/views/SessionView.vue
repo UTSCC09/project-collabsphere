@@ -74,11 +74,17 @@ onBeforeMount(() => {
     console.error('Socket.IO connection error:', err);
   });
 
+  // when a host joins, set them as the new host
   socket.on("new_host", (id) => {
     hostId.value = id;
     if (id === peer.id) {
       isHost.value = true;
     }
+  });
+
+  // when a host leaves, apply to be new host
+  socket.on("host_left", () => {
+    socket.emit("host_application", peer.id);
   });
 
   peer_init();
