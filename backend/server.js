@@ -9,8 +9,8 @@ import cors from 'cors';
 import { readFileSync } from "fs";
 import { createServer } from "https";
 import cookieParser from 'cookie-parser';
-import passport from "passport";
 import Session from "./models/Session.js";
+import jwt from 'jsonwebtoken';
 
 dotenv.config();
 
@@ -107,15 +107,6 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-io.engine.use((req, res, next) => {
-  const isHandshake = req._query.sid === undefined;
-  if (isHandshake) {
-    passport.authenticate("jwt", { session: false })(req, res, next);
-  } else {
-    next();
-  }
-});
-
 io.on("connection", (socket) => {
   console.log("Connection Request");
   socket.on("join_session", async (sessionId, id) => {
@@ -123,12 +114,13 @@ io.on("connection", (socket) => {
     socket.join(sessionId);
     socket.to(sessionId).emit("user_connection", id);
 
+    const userId = jwt.verify(socket.request.headers.cookie.split('=')[1], process.env.JWT_SECRET).id;
     const session = await Session.findById(sessionId);
-    const userId = socket.request.user.userId;
     if (userId === session.host.toString()) {
       session.tempHost = "";
       session.connId = id;
       await session.save();
+      console.log(session);
       socket.to(sessionId).emit("new_host", id);
     }
 

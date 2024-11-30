@@ -65,9 +65,6 @@ onBeforeMount(() => {
   socket = io(`${import.meta.env.VITE_PUBLIC_SOCKET}`, {
     transports: ['websocket', 'polling', 'flashsocket'],
     withCredentials: true,
-    extraHeaders: {
-      authorization: `bearer ${document.token}`
-    }
   });
 
   socket.on('connect', () => {
