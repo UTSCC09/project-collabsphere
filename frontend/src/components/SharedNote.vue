@@ -1,22 +1,24 @@
 <script setup type="module" lang="ts">
-    import { defineComponent, onMounted, ref } from 'vue';
-    import type { Ref}  from 'vue';
+import { onMounted, ref, Ref } from "vue";
 
-    const props = defineProps<{
-        socket: any,
-    }>();
+const props = defineProps({
+  socket: Object,
+});
 
-    const note: Ref<string | null> = ref(null);
-    onMounted(() => {
-        props.socket.on('note', (data: string) => {
-            note.value = data;
-        });
-    });
+const note: Ref<string | null> = ref(null);
+onMounted(() => {
+  props.socket.on('note', (data: string) => {
+    note.value = data;
+  });
+});
 
-    function transmit() {
-        props.socket.emit('note', note.value);
-    }
+function transmit() {
+  props.socket.emit('note', note.value);
+}
 
+defineExpose({
+  transmit,
+});
 </script>
 
 <template>

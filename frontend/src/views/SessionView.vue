@@ -42,6 +42,7 @@ const cursorIds: string[] = [];
 // null while no file has been uploaded
 const file: Ref<Blob | null> = ref(null);
 const documentReaderRef: Ref<Component | null> = ref(null);
+const sharedNotesRef: Ref<Component | null> = ref(null);
 
 interface data {
   x?: number,
@@ -73,6 +74,54 @@ onBeforeMount(() => {
 
   socket.on('connect_error', (err) => {
     console.error('Socket.IO connection error:', err);
+  });
+
+  peer_init();
+
+  // when a user connects to this session, create a new connection
+  // and initialize it.
+  socket.on("user_connection", (id) => {
+    console.log("Another user connected to the session.");
+    const conn = peer.connect(id);
+    conn.on("open", () => {
+      connection_init(conn);
+      otherUsers.set(conn.peer, {conn: conn});
+      // send your username to the other user
+      conn.send({username: username.value});
+
+      // send file if it exists and current user is the host
+      // TODO isHost is not actually implemented (isHost.value would work)
+        // otherwise if the host refreshes, the session is cleared
+        // maybe set another user as host or leave as currently is
+      if (isHost) {
+        if (file.value) {
+          const fileReader = new FileReader();
+          fileReader.onload = async () => {
+            conn.send({file: fileReader.result});
+          }
+          fileReader.readAsArrayBuffer(file.value);
+        }
+        // send notes
+        sharedNotesRef.value.transmit();
+      }
+    });
+  });
+
+  // when a user leaves this session, remove their cursor
+  socket.on("user_disconnection", (id) => {
+    const index = conns.indexOf(otherUsers.get(id).conn);
+    otherUsers.delete(id);
+
+    if (index !== -1) {
+      conns.splice(index, 1);
+
+      for (let i = 0; i < cursors.value.length; i++) {
+        if (cursors.value[i].id === id) {
+          cursorIds.splice(cursorIds.indexOf(id), 1);
+          cursors.value.splice(i, 1);
+        }
+      }
+    }
   });
 });
 
@@ -117,9 +166,9 @@ function connection_init(conn: Peer) {
       return;
     }
 
-    if (data.request && data.request === "annotations") {
-      documentReaderRef.value.sendAnnotationsTo(conn);
-      return;
+    if (data.request) {
+      if (data.request === "annotations")
+        documentReaderRef.value.sendAnnotationsTo(conn);
     }
   });
 
@@ -147,46 +196,6 @@ function peer_init() {
 
 onMounted(() => {
   mounted.value = true;
-  peer_init();
-
-  // when a user connects to this session, create a new connection
-  // and initialize it.
-  socket.on("user_connection", (id) => {
-    console.log("Another user connected to the session.");
-    const conn = peer.connect(id);
-    conn.on("open", () => {
-      connection_init(conn);
-      otherUsers.set(conn.peer, {conn: conn});
-      // send your username to the other user
-      conn.send({username: username.value});
-
-      // send file if it exists and current user is the host
-      if (file.value && isHost) {
-        const fileReader = new FileReader();
-        fileReader.onload = async () => {
-          conn.send({file: fileReader.result});
-        }
-        fileReader.readAsArrayBuffer(file.value);
-      }
-    });
-  });
-
-  // when a user leaves this session, remove their cursor
-  socket.on("user_disconnection", (id) => {
-    const index = conns.indexOf(otherUsers.get(id).conn);
-    otherUsers.delete(id);
-
-    if (index !== -1) {
-      conns.splice(index, 1);
-
-      for (let i = 0; i < cursors.value.length; i++) {
-        if (cursors.value[i].id === id) {
-          cursorIds.splice(cursorIds.indexOf(id), 1);
-          cursors.value.splice(i, 1);
-        }
-      }
-    }
-  });
 
   // when mouse is moved, broadcast mouse position to all connections
   function sendCursor(
@@ -246,8 +255,7 @@ onBeforeUnmount(() => {
       <div id="main-item" class="basis-2/3">
         <div v-if="mounted">
           <Teleport :disabled="!isFile" to="#top-side-item">
-            <h1 v-if="!isFile && !isHost" class="text-1xl">Waiting for host to upload a document...</h1>
-              
+            <SharedNote id="notes" :socket="socket" :conns="conns" ref="sharedNotesRef" class="min-h-[50vh] flex flex-col"/>
           </Teleport>
         </div>
         <div v-if="isFile" id="viewer">
@@ -255,19 +263,26 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div id="side-items" class="basis-1/3 ml-5">
-        <div id="top-side-item" class="justify-self-center">
-          <label id="pdf-input" v-if="isHost && !isFile" class="a-href w-fit text-xl btn-and-icon mb-8">
-            <v-icon name="fa-file-upload"></v-icon>
+        <div id="temp-side-item" class="m-auto text-center" v-if="isHost && !isFile">
+          <label id="pdf-input" class="a-href underline font-extrabold text-xl">
             <input type="file" @input="handleFileInput" name="upload" accept="application/pdf" class="hidden" />
             Upload PDF
           </label>
         </div>
-        <div id="bottom-side-item" class="min-h-[50vh] flex flex-col">
-          <SharedNote :socket="socket"/>
+        <div id="top-side-item" class="m-auto">
+
         </div>
+        <!--
+        <div id="bottom-side-item" class="min-h-[50vh] flex flex-col">
+          <SharedNote :socket="socket" :conns="conns" ref="sharedNotesRef"/>
+        </div>
+        -->
       </div>
     </div>
   </div>
 </template>
 <style scoped>
+#notes {
+  height: calc(87.5vh - 80px);
+}
 </style>
