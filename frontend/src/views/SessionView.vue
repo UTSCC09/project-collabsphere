@@ -7,7 +7,6 @@ import CursorItem from "@/components/CursorItem.vue";
 import DocumentReader from "@/components/DocumentReader.vue";
 import { useUserdataStore } from "@/stores/userdata";
 import SharedNote from "@/components/SharedNote.vue";
-import { onBeforeRouteLeave } from "vue-router";
 
 // true if user is host
 const isHost = computed(() => {
@@ -66,6 +65,9 @@ onBeforeMount(() => {
   socket = io(`${import.meta.env.VITE_PUBLIC_SOCKET}`, {
     transports: ['websocket', 'polling', 'flashsocket'],
     withCredentials: true,
+    extraHeaders: {
+      authorization: `bearer ${document.token}`
+    }
   });
 
   socket.on('connect', () => {

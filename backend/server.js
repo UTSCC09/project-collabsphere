@@ -9,7 +9,8 @@ import cors from 'cors';
 import { readFileSync } from "fs";
 import { createServer } from "https";
 import cookieParser from 'cookie-parser';
-import { verifyToken } from './middleware/authMiddleware.js';
+import passport from "passport";
+import Session from "./models/Session.js";
 
 dotenv.config();
 
@@ -104,23 +105,58 @@ if (process.env.NODE_ENV !== 'test') {
   server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
-
 }
+
+io.engine.use((req, res, next) => {
+  const isHandshake = req._query.sid === undefined;
+  if (isHandshake) {
+    passport.authenticate("jwt", { session: false })(req, res, next);
+  } else {
+    next();
+  }
+});
 
 io.on("connection", (socket) => {
   console.log("Connection Request");
-  socket.on("join_session", (sessionId, id) => {
+  socket.on("join_session", async (sessionId, id) => {
     console.log("Received join request from " + id);
     socket.join(sessionId);
     socket.to(sessionId).emit("user_connection", id);
+
+    const session = await Session.findById(sessionId);
+    const userId = socket.request.user.userId;
+    if (userId === session.host.toString()) {
+      session.tempHost = "";
+      session.connId = id;
+      await session.save();
+      socket.to(sessionId).emit("new_host", id);
+    }
 
     socket.on('note', (note) => {
       socket.to(sessionId).emit('note', note);
     });
 
-    socket.on("disconnect", () => {
+    socket.on('host_application', async () => {
+      const session = await Session.findById(sessionId);
+      if (!session.tempHost) {
+        session.tempHost = userId;
+        await session.save();
+        socket.emit("new_host", id);
+      }
+    });
+
+    socket.on("disconnect", async () => {
       socket.to(sessionId).emit("user_disconnection", id);
       socket.leave(sessionId);
+
+      const session = await Session.findById(sessionId);
+      if (userId === session.host.toString()) {
+        socket.to(sessionId).emit("host_left");
+      } else if (userId === session.tempHost.toString()) {
+        session.tempHost = "";
+        await session.save();
+        socket.to(sessionId).emit("host_left");
+      }
     });
   });
 });
