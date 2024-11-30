@@ -123,26 +123,113 @@ const bind_mediasoup = (socket, sessionId, id) => {
 	// ? Placed here to reuse parent scope variables
 
 	/* Returns a boolean indicating whether the transport belongs to the client */
-	const transport_belongs_to_self = (transportId) => {
+	const transport_belongs_to_self = (transportId, callback = (data) => {}) => {
 		try {
-			// Validate that the transportID belongs to the socket client
-			const client = room.clients.get(id);
+			const room = get_room(sessionId);
+			const client = get_client(room, id);
 			if (!client) {
 				console.error("Client not found");
 				callback({ error: "Client not found" });
 				return false;
 			}
 
+			console.log(client.transports.map((t) => t));
 			if (client.transports && !client.transports.includes(transportId)) {
 				console.error("Client Transport ID does not match");
 				callback({ error: "Client Transport ID does not match" });
-				return true;
+				return false;
 			}
-		}
-		catch (error) {
+			return true;
+		} catch (error) {
 			console.error("Error:", error);
 		}
 		return false;
+	};
+
+	const producer_or_consurmer_belongs_to_self = (transportId, callback = (data) => {}) => {
+		try {
+			const room = get_room(sessionId);
+			const client = get_client(room, id);
+			if (!client) {
+				console.error("Client not found");
+				callback({ error: "Client not found" });
+				return false;
+			}
+
+			console.log(client.video_producer, client.audio_producer, client.consumer);
+
+			if (client.video_producer && client.video_producer === transportId) {
+				console.log("Client Producer ID matches");
+				return true;
+			}
+
+			if (client.audio_producer && client.audio_producer === transportId) {
+				console.log("Client Producer ID matches");
+				return true;
+			}
+
+			if (client.consumer && client.consumer === transportId) {
+				console.log("Client Consumer ID matches");
+				return true;
+			}
+		} catch (error) {
+			console.error("Error:", error);
+		}
+		return false;
+	};
+
+	const is_host_or_transport_owner = (transportId, callback = (data) => {}) => {
+		// TODO : Implement host
+		return transport_belongs_to_self(transportId) || producer_or_consurmer_belongs_to_self(transportId);
+	};
+
+	/* Get the client object from the room (key = sessionId) */
+	const get_client = (room, id) => {
+		return room.clients.get(id) || { socket, transports: [] };
+	};
+
+	/* Create a WebRTCTransport */
+	const createWebRtcTransport = async (router) => {
+		const transport = await router.createWebRtcTransport({
+			// If you are testing locally on Firefox
+			// I also received ICE stun server errors.
+			// Apparently Firefox does not support loopback compared to Chrome.
+			listenIps: [
+				{ ip: "0.0.0.0", announcedIp: "127.0.0.1" },
+				{ ip: "0.0.0.0", announcedIp: "localhost" },
+			],
+
+			enableUdp: true,
+			enableTcp: true,
+			preferUdp: true,
+		});
+
+		transports.set(transport.id, transport);
+
+		transport.on("dtlsstatechange", (dtlsState) => {
+			if (dtlsState === "closed") {
+				transport.close();
+				// Remove from transports
+				transports.delete(transport.id);
+			}
+		});
+
+		transport.on("close", () => {
+			console.log("Transport closed");
+		});
+
+		transport.on("connectionstatechange", (state) => {
+			console.log("Transport state:", state); // Should eventually be "connected"
+		});
+
+		// Add transport to client
+		const room = get_room(sessionId);
+		const client = get_client(room, id);
+		client["transports"].push(transport.id);
+		rooms.set(sessionId, room);
+
+		console.log(`(createWebRtcTransport) Transport(id=${transport.id}) created for client`, id);
+		return transport;
 	};
 
 	// EVENT HANDLERS ----------------------------------------------
@@ -164,8 +251,11 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		const router = await get_router(sessionId);
 
 		const room = get_room(sessionId);
-		room.clients.set(id, { socket });
+		const client = get_client(room, id);
+		room.clients.set(id, client);
 		rooms.set(sessionId, room);
+
+		console.log(`(join_stream_room) Client ${id} joined room ${sessionId}`);
 
 		const producerIds = room.producers.map((producer) => {
 			return {
@@ -190,7 +280,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 	/* Create a WebRTCTransport  */
 	socket.on("create_transport", async (callback) => {
 		const router = await get_router(sessionId);
-		const transport = await createWebRtcTransport(sessionId, id, router);
+		const transport = await createWebRtcTransport(router);
 		const transport_callback_data = {
 			id: transport.id,
 			iceParameters: transport.iceParameters,
@@ -232,7 +322,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			callback({ error: "Transport not found" });
 			return;
 		}
-		
+
 		if (!transport_belongs_to_self(transportId)) {
 			console.error("Transport does not belong to client");
 			callback({ error: "Transport does not belong to client" });
@@ -240,10 +330,10 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		}
 
 		const payload = {
-			kind, 
-			rtpParameters, 
-			appData: { ...appData, id }
-		}
+			kind,
+			rtpParameters,
+			appData: { ...appData, id },
+		};
 
 		const producer = await transport.produce(payload);
 
@@ -251,7 +341,12 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		room.producers.push(producer);
 		const client = room.clients.get(id);
 		if (client) {
-			client["producer"] = producer.id;
+			if (kind === "audio") {
+				client["audio_producer"] = producer.id;
+			}
+			if (kind === "video") {
+				client["video_producer"] = producer.id;
+			}
 		}
 		rooms.set(sessionId, room);
 
@@ -265,7 +360,6 @@ const bind_mediasoup = (socket, sessionId, id) => {
 
 		callback({ id: producer.id });
 	});
-
 
 	/* Create a consumer for a given producer  */
 	socket.on("consume", async ({ transportId, producerId, rtpCapabilities }, callback) => {
@@ -312,6 +406,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		});
 
 		room.consumers.push(consumer);
+		const client = get_client(room, id);
 		if (client) {
 			client["consumer"] = consumer.id;
 		}
@@ -333,6 +428,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		callback({ params });
 	});
 
+	/* In response to a consumer resume request, resume the consumer */
 	socket.on("consumer-resume", async ({ consumerId }) => {
 		const room = get_room(sessionId);
 		const consumer = room.consumers.find((c) => c.id === consumerId);
@@ -342,56 +438,75 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			return;
 		}
 		await consumer.resume();
+		socket.to(sessionId).emit("consumer-resumed", consumerId);
 	});
 
-	/* Host and client perms */
-};
+	/* In response to a consumer pause request, pause the consumer */
+	socket.on("pause_consumer", async ({ consumerId }) => {
+		const room = get_room(sessionId);
+		const consumer = room.consumers.find((c) => c.id === consumerId);
 
-const createWebRtcTransport = async (sessionId, id, router) => {
-	const transport = await router.createWebRtcTransport({
-		listenIps: [
-			{ ip: "0.0.0.0", announcedIp: "127.0.0.1" },
-			{ ip: "0.0.0.0", announcedIp: "localhost"},
-		], // 127.0.0.1 incompatible with Firefox
-
-		enableUdp: true,
-		enableTcp: true,
-		preferUdp: true,
-	});
-	
-	transports.set(transport.id, transport);
-	
-	transport.on("dtlsstatechange", (dtlsState) => {
-		if (dtlsState === "closed") {
-			transport.close();
-			// Remove from transports
-			transports.delete(transport.id);
+		// Check that either we are host or we own the transport
+		if (!is_host_or_transport_owner(consumer.transportId)) {
+			console.error("Not host or transport owner");
+			return;
 		}
-	});
 
-	transport.on("close", () => {
-		console.log("Transport closed");
-	});
-
-	transport.on("connectionstatechange", (state) => {
-		console.log("Transport state:", state); // Should eventually be "connected"
-	});
-
-	// Add transport to client
-	const room = get_room(sessionId);
-	const client = room.clients.get(id);
-	if (client) {
-		if (client["transports"]) {
-			client["transports"].push(transport.id);
-		} else {
-			client["transports"] = [transport.id];
+		if (!consumer) {
+			console.error("Consumer not found");
+			return;
 		}
-	}
-	rooms.set(sessionId, room);
+		await consumer.pause();
+		socket.to(sessionId).emit("consumer-paused", consumerId);
+	});
 
-	return transport;
+	socket.on("pause-producer", async ({ clientId, producerId, kind }, callback) => {
+		const room = get_room(sessionId);
+		const producer = room.producers.find((p) => p.id === producerId);
+
+		console.log(`(pause-producer) called by ${label}(pr=${producerId})`);
+
+		console.log(room.producers.map((p) => p.id));
+		if (!producer) {
+			console.error("Producer not found");
+			callback({ error: "Producer not found" });
+			return;
+		}
+
+		if (!is_host_or_transport_owner(producerId)) {
+			console.error("Not host or transport owner");
+			callback({ error: "Not host or transport owner" });
+			return;
+		}
+
+		producer.pause();
+		socket.to(sessionId).emit("producer-paused", { clientId, producerId, kind });
+		callback();
+	});
+
+	socket.on("resume-producer", async ({ clientId, producerId, kind }, callback) => {
+		const room = get_room(sessionId);
+		const producer = room.producers.find((p) => p.id === producerId);
+
+		console.log(`(resume-producer) called by ${label}(pr=${producerId})`);
+
+		if (!producer) {
+			console.error("Producer not found");
+			callback({ error: "Producer not found" });
+			return;
+		}
+
+		if (!is_host_or_transport_owner(producerId)) {
+			console.error("Not host or transport owner");
+			callback({ error: "Not host or transport owner" });
+			return;
+		}
+
+		producer.resume();
+		socket.to(sessionId).emit("producer-resumed", { clientId, producerId, kind });
+		callback();
+	});
 };
-
 
 const remove_room = (socketId) => {
 	delete rooms[socketId];
@@ -403,14 +518,14 @@ const client_disconnect = (sessionId, id) => {
 		console.log("Room not found");
 		return;
 	}
-	
+
 	const client = room.clients.get(id);
 	if (!client) {
 		console.log("Client not found");
 		return;
 	}
-	
-	const socket = client.socket
+
+	const socket = client.socket;
 
 	if (!socket) {
 		console.log("Socket not found");
@@ -419,13 +534,20 @@ const client_disconnect = (sessionId, id) => {
 
 	socket.to(sessionId).emit("remove_client", id);
 
-	const producerId = client.producer;
+	const videoProducerId = client.video_producer;
+	const audioProducerId = client.audio_producer;
 	const consumerId = client.consumer;
 
-	if (producerId) {
-		const producer = room.producers.find((p) => p.id === producerId);
+	if (videoProducerId) {
+		const producer = room.producers.find((p) => p.id === videoProducerId);
 		producer.close();
-		room.producers = room.producers.filter((p) => p.id !== producerId);
+		room.producers = room.producers.filter((p) => p.id !== videoProducerId);
+	}
+
+	if (audioProducerId) {
+		const producer = room.producers.find((p) => p.id === audioProducerId);
+		producer.close();
+		room.producers = room.producers.filter((p) => p.id !== audioProducerId);
 	}
 
 	if (consumerId) {
@@ -437,7 +559,7 @@ const client_disconnect = (sessionId, id) => {
 	delete room.clients[id];
 
 	rooms.set(sessionId, room);
-}
+};
 
 (async () => {
 	await createWorker();

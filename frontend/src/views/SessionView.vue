@@ -275,7 +275,7 @@ onMounted(() => {
       </div>
       <div class="flex flex-col gap-2 w-fit bg-slate-300 overflow-scroll h-[85vh]">
           <!-- For looop  -->
-        <ClientAVFrame v-for="([key, data], index) in clientConfigData.entries()" :key="key" :data="data" :socket="socket"/>
+        <ClientAVFrame v-for="([key, data], index) in clientConfigData.entries()" :key="key" :data="data"/>
       </div>
     </div>
   </div>
