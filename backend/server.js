@@ -116,24 +116,27 @@ io.on("connection", (socket) => {
 
     const userId = jwt.verify(socket.request.headers.cookie.split('=')[1], process.env.JWT_SECRET).id;
     const session = await Session.findById(sessionId);
+
+    // if current user is host, emit their connection id
     if (userId === session.host.toString()) {
       session.tempHost = "";
       session.connId = id;
       await session.save();
-      console.log(session);
-      socket.to(sessionId).emit("new_host", id);
+      // io instead of socket so the host also receives the message
+      io.to(sessionId).emit("new_host", id);
     }
 
-    socket.on('note', (note) => {
-      socket.to(sessionId).emit('note', note);
+    socket.on("note", (note) => {
+      socket.to(sessionId).emit("note", note);
     });
 
-    socket.on('host_application', async () => {
+    socket.on("host_application", async () => {
       const session = await Session.findById(sessionId);
       if (!session.tempHost) {
         session.tempHost = userId;
         await session.save();
-        socket.emit("new_host", id);
+        // io instead of socket so the host also receives the message
+        io.emit("new_host", id);
       }
     });
 

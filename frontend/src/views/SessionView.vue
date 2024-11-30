@@ -9,9 +9,8 @@ import { useUserdataStore } from "@/stores/userdata";
 import SharedNote from "@/components/SharedNote.vue";
 
 // true if user is host
-const isHost = computed(() => {
-  return useUserdataStore().isHost;
-});
+const isHost = ref(false);
+const hostId = ref(null);
 
 const sessionID = computed(() => {
   return useUserdataStore().sessionID;
@@ -75,6 +74,13 @@ onBeforeMount(() => {
     console.error('Socket.IO connection error:', err);
   });
 
+  socket.on("new_host", (id) => {
+    hostId.value = id;
+    if (id === peer.id) {
+      isHost.value = true;
+    }
+  });
+
   peer_init();
 
   // when a user connects to this session, create a new connection
@@ -89,10 +95,7 @@ onBeforeMount(() => {
       conn.send({username: username.value});
 
       // send file if it exists and current user is the host
-      // TODO isHost is not actually implemented (isHost.value would work)
-        // otherwise if the host refreshes, the session is cleared
-        // maybe set another user as host or leave as currently is
-      if (isHost) {
+      if (isHost.value) {
         if (file.value) {
           const fileReader = new FileReader();
           fileReader.onload = async () => {
