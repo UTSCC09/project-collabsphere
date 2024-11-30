@@ -14,7 +14,6 @@ const workerSettings = {
 	dtlsPrivateKeyFile: process.env.SSL_PRIVATE_KEY_PATH,
 };
 
-
 // https://mediasoup.org/documentation/v3/mediasoup/api/#RouterOptions
 const ms_routerOptions = {
 	logLevel: "warn",
@@ -65,14 +64,20 @@ const ms_routerOptions = {
 let ms_worker;
 let ms_router;
 
+const transports = new Map();
 const rooms = new Map();
 
+/* Get the room object from the rooms Map */
 const get_room = (sessionId) => {
 	return rooms.get(sessionId) || { producers: [], consumers: [], clients: new Map() };
 };
 
-const transports = new Map();
+/* Remove the room object from the rooms Map */
+const remove_room = (socketId) => {
+	delete rooms[socketId];
+};
 
+/* Create a new Worker and Router for the room if it doesn't exist. */
 const createWorker = async () => {
 	ms_worker = await mediasoup.createWorker(workerSettings);
 	ms_worker.on("died", () => {
@@ -85,8 +90,6 @@ const createWorker = async () => {
 	console.log(`Worker: rtcMinPort = ${workerSettings.rtcMinPort}`);
 	console.log(`Worker: rtcMaxPort = ${workerSettings.rtcMaxPort}`);
 };
-
-
 
 /* Create a new Router for the room if it doesn't exist. */
 const get_router = async (sessionId) => {
@@ -521,10 +524,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 	});
 };
 
-const remove_room = (socketId) => {
-	delete rooms[socketId];
-};
-
+/* Remove the client from the room and close all associated transports */
 const client_disconnect = (sessionId, id) => {
 	const room = get_room(sessionId);
 	if (!room) {
