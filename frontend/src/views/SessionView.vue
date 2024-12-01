@@ -307,7 +307,7 @@ onBeforeUnmount(() => {
     <h1 class="ml-2"><v-icon name='fa-users' class="scale-105"/> <span v-text="1 + otherUsers.size"/> Connected </h1>
     <CursorItem v-for="cursor in cursors" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" style="z-index:100"/>
     <hr class="my-3" />
-    <div class="flex flex-row m-5">
+    <div class="flex flex-row m-5 mr-0">
       <div id="main-item" class="basis-2/3">
         <div v-if="mounted">
           <Teleport :disabled="!isFile" to="#top-side-item">
