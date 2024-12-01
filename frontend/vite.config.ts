@@ -12,19 +12,22 @@ export default defineConfig(({mode}) => {
     return {
       server: {
         https: {
-          key: fs.readFileSync(env.VITE_SSL_PRIVATE_KEY_PATH || '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem'),
-          cert: fs.readFileSync(env.VITE_SSL_CERTIFICATE_PATH || '/etc/letsencrypt/live/collabsphere.xyz/cert.pem')
+          key: fs.readFileSync(
+            env.VITE_SSL_PRIVATE_KEY_PATH ??
+              '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem',
+          ),
+          cert: fs.readFileSync(
+            env.VITE_SSL_CERTIFICATE_PATH ??
+              '/etc/letsencrypt/live/collabsphere.xyz/cert.pem',
+          ),
         },
         host: '0.0.0.0',
       },
-      plugins: [
-        vue(),
-        vueDevTools(),
-      ],
+      plugins: [vue(), vueDevTools()],
       resolve: {
         alias: {
-          '@': fileURLToPath(new URL('./src', import.meta.url))
-        }
-     }
-  }
+          '@': fileURLToPath(new URL('./src', import.meta.url)),
+        },
+      },
+    }
 });

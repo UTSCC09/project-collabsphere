@@ -25,7 +25,7 @@ watch(notificationStore.notifications, (notifs) => {
 </script>
 
 <template>
-    <div class="fixed bottom-0 flex flex-col items-center justify-center m-4 w-full">
+    <div class="fixed bottom-0 left-0 flex flex-col items-center justify-center my-4 w-screen">
         <div v-for="notification in notifications"
         :key="notification.id" :id="notification.id" class="bg-black/80 backdrop-blur-sm text-white shadow-md rounded-lg px-4 p-2 m-2 min-w-52">
             <div v-if="notification.title" class="notif-enter">

@@ -41,8 +41,8 @@ function joinSession() {
       headers: {
         'Content-Type': 'application/json',
       },
-    }
-  ).then((data: {session: {_id: string}}) => {
+    })
+    .then((data: {session: {_id: string}}) => {
       if (!data.session || !data.session._id) {
         sessionID_error.value = 'Session not found'
         return
@@ -51,13 +51,18 @@ function joinSession() {
       userstore.joinSession(data.session._id)
       // Jump to session view
       router.push('/session')
-    }).catch(() => {})
+    })
+    .catch((error) => {
+      sessionID_error.value = error.message
+    })
 }
 
 
 </script>
 
 <template>
+
+
   <main v-if="!isLoggedIn">
     <h1>You need an account to enjoy CollabSphere</h1>
     <LoginItem />
@@ -83,6 +88,6 @@ function joinSession() {
     <p class="text-red-500">{{sessionID_error}}</p>
 
     </div>
+    
   </main>
-
 </template>
