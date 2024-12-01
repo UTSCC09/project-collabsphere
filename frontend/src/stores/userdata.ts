@@ -14,11 +14,13 @@ export const useUserdataStore = defineStore('userdata', () => {
     isLoggedIn.value = true
   }
 
-  const logout = () => {
-    fetch(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/signout`, {
-      method: 'GET',
-      credentials: 'include',
-    }).then(() => {
+  const logout = async () => {
+    try {
+      await fetch(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/signout`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+
       isLoggedIn.value = false
       username.value = ''
       useremail.value = ''
@@ -26,9 +28,9 @@ export const useUserdataStore = defineStore('userdata', () => {
       isHost.value = false
       
       clearLocalStorage()
-    }).finally(() => {
-      window.location.reload()
-    });
+    } catch (error) {
+      console.error("Sign-out failed:", error)
+    }
   }
 
   const setUsername = (name: string) => {

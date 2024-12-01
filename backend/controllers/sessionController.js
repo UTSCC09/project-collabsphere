@@ -49,3 +49,17 @@ export const leaveSession = async (req, res) => {
     res.status(500).json({ message: 'Failed to leave session' });
   }
 };
+
+// gets the connection id of the host of the session
+export const getSessionHost = async (req, res) => {
+  const sessionId = req.params.id;
+  try {
+    const session = await Session.findById(sessionId);
+    if (!session) return res.status(404).json({ message: 'Session not found' });
+    if (!session.connId) return res.status(404).json({ message: 'Connection not found' });
+
+    res.json({ message: 'Session created', hostId: session.connId });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to get host connection id', error });
+  }
+};
