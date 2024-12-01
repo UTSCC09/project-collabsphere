@@ -166,7 +166,6 @@ function connection_init(conn: Peer) {
     }
 
     if (data.x && data.y && otherUsers.get(conn.peer).username) {
-      // TODO use interpolation
       x_coord.value = data.x;
       y_coord.value = data.y;
 

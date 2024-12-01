@@ -115,46 +115,36 @@ io.on("connection", (socket) => {
     socket.to(sessionId).emit("user_connection", id);
 
     const userId = jwt.verify(socket.request.headers.cookie.split('=')[1], process.env.JWT_SECRET).id;
-    const session = await Session.findById(sessionId);
-    if (!session) return;
-
-    // if current user is host, emit their connection id
-    if (userId === session.host.toString()) {
-      session.connId = id;
-      await session.save();
+    await Session.findOneAndUpdate({_id: sessionId, host: userId}, {connId: id}, {new: false})
+    .then(doc => {
+      if (!doc) return;
       // io instead of socket so the host also receives the message
       io.to(sessionId).emit("new_host", id);
-    }
+    });
 
     socket.on("note", (note) => {
       socket.to(sessionId).emit("note", note);
     });
 
     socket.on("host_application", async () => {
-      const session = await Session.findById(sessionId);
-      if (!session) return;
-      // !session.connId prevents a socket from emitting host_application while host exists
-      // also, only allows the first to respond (typically the best internet speed)
-      if (!session.connId) {
-        session.host = userId;
-        session.connId = id;
-        await session.save();
+      await Session.findOneAndUpdate({_id: sessionId, connId: ''}, {host: userId, connId: id}, {new: false})
+      .then(doc => {
+        if (!doc) return;
         // io instead of socket so the host also receives the message
         io.emit("new_host", id);
-      }
+      });
     });
 
     socket.on("disconnect", async () => {
       socket.to(sessionId).emit("user_disconnection", id);
       socket.leave(sessionId);
 
-      const session = await Session.findById(sessionId);
-      if (!session) return;
+      await Session.findOneAndUpdate({_id: sessionId, host: userId}, {connId: ''}, {new: false})
+      .then(doc => {
+        if (!doc) return;
 
-      if (userId === session.host.toString()) {
-        session.connId = "";
-        await session.save();
         socket.to(sessionId).emit("host_left");
+
         // if no new host within 10 seconds, delete session
         setTimeout(async () => {
           const session = await Session.findById(sessionId);
@@ -164,7 +154,7 @@ io.on("connection", (socket) => {
             console.log("Deleted session: " + sessionId);
           }
         }, 10000);
-      }
+      });
     });
   });
 });
