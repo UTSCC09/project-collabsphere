@@ -112,7 +112,7 @@ async function signup() {
         body: JSON.stringify({
           username: username.value,
           email: email.value,
-          password: password.value, 
+          password: password.value,
         }),
       },
     )
@@ -175,11 +175,6 @@ const isDisabled = computed(() => {
         <div>
           <div class="flex items-center justify-between">
             <label for="password" class="form-label">Password</label>
-            <div class="text-sm">
-              <a href="#" class="a-href" @click="status = 'Reset password'"
-                >Forgot password?</a
-              >
-            </div>
           </div>
           <div class="mt-2">
             <input
@@ -212,7 +207,7 @@ const isDisabled = computed(() => {
       <form class="space-y-6" @submit.prevent="signup">
         <div>
           <label for="display" class="form-label">Display name</label>
-          
+
           <div class="mt-2">
             <input
               id="username"
@@ -299,12 +294,14 @@ const isDisabled = computed(() => {
         <a href="#" class="a-href" @click="status = 'Sign in'">Sign in</a>
       </p>
     </div>
+    <!--
     <div
       v-else-if="status === 'Reset password'"
       class="mt-10 sm:mx-auto sm:w-full sm:max-w-sm"
     >
       <p>TODO: Implement at the end</p>
     </div>
+    -->
   </div>
 </template>
 
