@@ -119,7 +119,7 @@ io.on("connection", (socket) => {
 		socket.to(sessionId).emit("user_connection", id);
 
     const userId = jwt.verify(socket.request.headers.cookie.split('=')[1], process.env.JWT_SECRET).id;
-    await Session.findOneAndUpdate({_id: sessionId, host: userId}, {connId: id}, {new: false})
+    await Session.findOneAndUpdate({_id: sessionId, host: userId}, {connId: id}, {new: false, sanitizeFilter: true})
     .then(doc => {
       if (!doc) return;
       // io instead of socket so the host also receives the message
@@ -131,7 +131,7 @@ io.on("connection", (socket) => {
     });
 
     socket.on("host_application", async () => {
-      await Session.findOneAndUpdate({_id: sessionId, connId: ''}, {host: userId, connId: id}, {new: false})
+      await Session.findOneAndUpdate({_id: sessionId, connId: ''}, {host: userId, connId: id}, {new: false, sanitizeFilter: true})
       .then(doc => {
         if (!doc) return;
         // io instead of socket so the host also receives the message
@@ -144,7 +144,7 @@ io.on("connection", (socket) => {
       socket.leave(sessionId);
       ms_client_disconnect(sessionId, id);
 
-      await Session.findOneAndUpdate({_id: sessionId, host: userId}, {connId: ''}, {new: false})
+      await Session.findOneAndUpdate({_id: sessionId, host: userId}, {connId: ''}, {new: false, sanitizeFilter: true})
       .then(doc => {
         if (!doc) return;
 
