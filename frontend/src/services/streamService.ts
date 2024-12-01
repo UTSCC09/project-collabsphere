@@ -601,7 +601,12 @@ function removeClientStream(id: string) {
 
 /* Disconnect from the SFU and reset states */
 function onDisconnect() {
+  // Close transports
+  if (producerTransport.value) producerTransport.value?.close()
+  if (consumerTransport.value) consumerTransport.value?.close()
+
   device.value = null
+
   consumerTransport.value = null
   producerTransport.value = null
 
@@ -615,7 +620,9 @@ function onDisconnect() {
   navigator.mediaDevices
     .getUserMedia({ video: true, audio: true })
     .then(stream => {
-      stream.getTracks().forEach(track => track.stop())
+      stream.getTracks().forEach(track => {
+        track.stop()
+      })
     })
 
   clientConfigData.value.clear()

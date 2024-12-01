@@ -527,8 +527,15 @@ const client_disconnect = (sessionId, id) => {
 
 	client_transports.forEach((transportId) => {
 		const transport = transports.get(transportId);
-		transport.close();
-		transports.delete(transportId);
+
+		try {
+			if (transport) {
+				transport.close();
+			}
+			transports.delete(transportId);
+		} catch (error) {
+			console.error("Error closing transport:", error);
+		}
 	});
 
 	delete room.clients[id];

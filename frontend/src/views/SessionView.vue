@@ -115,9 +115,6 @@ onBeforeMount(async () => {
   // TODO race condition. Running await getHostId() before causes connections to fail
   peer_init();
 
-  // hostId is needed before setup can continue
-  await getHostId();
-
   // when a user connects to this session, create a new connection
   // and initialize it.
   socket.on("user_connection", (id) => {
@@ -177,7 +174,7 @@ function connection_init(conn: Peer) {
   conn.on("data", (data: data) => {
     // reject if conn.peer is not in otherUsers
     if (!otherUsers.has(conn.peer)) return;
-    
+
     if (data.username) {
       otherUsers.get(conn.peer).username = data.username;
       
@@ -228,8 +225,9 @@ function connection_init(conn: Peer) {
 function peer_init() {
   peer.on("open", (id: string) => {
     console.log("Joining session.", sessionID.value, id, username.value);
-    socket.emit("join_session", sessionID.value, id, () => {
+    socket.emit("join_session", sessionID.value, id, async () => {
       setupMedia(socket, username.value);
+      await getHostId();
     });
 
   });
