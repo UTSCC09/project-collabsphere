@@ -117,9 +117,9 @@ io.on("connection", (socket) => {
     const userId = jwt.verify(socket.request.headers.cookie.split('=')[1], process.env.JWT_SECRET).id;
     const session = await Session.findById(sessionId);
 
+    // TODO remove for optimization
     // if current user is host, emit their connection id
     if (userId === session.host.toString()) {
-      session.tempHost = "";
       session.connId = id;
       await session.save();
       // io instead of socket so the host also receives the message
@@ -132,10 +132,10 @@ io.on("connection", (socket) => {
 
     socket.on("host_application", async () => {
       const session = await Session.findById(sessionId);
-      // !session.tempHost only allows the first to respond (typically the best internet speed)
       // !session.connId prevents a socket from emitting host_application while host exists
-      if (!session.tempHost && !session.connId) {
-        session.tempHost = userId;
+      // also, only allows the first to respond (typically the best internet speed)
+      if (!session.connId) {
+        session.host = userId;
         session.connId = id;
         await session.save();
         // io instead of socket so the host also receives the message
@@ -149,11 +149,6 @@ io.on("connection", (socket) => {
 
       const session = await Session.findById(sessionId);
       if (userId === session.host.toString()) {
-        session.connId = "";
-        await session.save();
-        socket.to(sessionId).emit("host_left");
-      } else if (userId === session.tempHost.toString()) {
-        session.tempHost = "";
         session.connId = "";
         await session.save();
         socket.to(sessionId).emit("host_left");
