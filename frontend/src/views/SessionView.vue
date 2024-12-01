@@ -324,7 +324,7 @@ onBeforeUnmount(() => {
           <DocumentReader v-if="file" :file="file" ref="documentReaderRef" @sendAnnotations="sendAnnotations" @requestAnnotations="requestAnnotations"/>
         </div>
       </div>
-      <div id="side-items" class="basis-1/3 ml-5">
+      <div id="side-items" class="basis-1/3 ml-5 mr-5">
         <div id="temp-side-item" class="m-auto text-center" v-if="isHost && !isFile">
           <label id="pdf-input" class="a-href underline font-extrabold text-xl">
             <input type="file" @input="handleFileInput" name="upload" accept="application/pdf" class="hidden" />
@@ -332,16 +332,13 @@ onBeforeUnmount(() => {
           </label>
         </div>
         <div id="top-side-item" class="m-auto">
-          <div class="flex flex-col gap-2 w-fit bg-slate-300 overflow-scroll h-[85vh]">
-              <!-- For looop  -->
-            <ClientAVFrame v-for="([key, data], index) in clientConfigData.entries()" :key="key" :data="data"/>
-          </div>
         </div>
-        <!--
-        <div id="bottom-side-item" class="min-h-[50vh] flex flex-col">
-          <SharedNote :socket="socket" :conns="conns" ref="sharedNotesRef"/>
+      </div>
+      <div id="video-chat" class="m-auto">
+        <div class="flex flex-col gap-2 w-fit bg-slate-300 overflow-scroll h-[85vh]">
+          <!-- For loop  -->
+          <ClientAVFrame v-for="([key, data], index) in clientConfigData.entries()" :key="key" :data="data"/>
         </div>
-        -->
       </div>
     </div>
   </div>
