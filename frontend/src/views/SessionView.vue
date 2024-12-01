@@ -1,13 +1,15 @@
 <script setup lang="ts" type="module">
-import {computed, onMounted, ref, Ref, Component, onBeforeUnmount, onBeforeMount} from "vue";
+import {computed, onMounted, ref, type Ref, type Component, onBeforeUnmount, onBeforeMount, watch} from "vue";
 import { Peer } from "https://esm.sh/peerjs@1.5.4?bundle-deps"
 import { throttle } from 'throttle-debounce';
-import { io } from "socket.io-client";
+import { io, Socket } from "socket.io-client";
 import CursorItem from "@/components/CursorItem.vue";
 import DocumentReader from "@/components/DocumentReader.vue";
 import { useUserdataStore } from "@/stores/userdata";
 import SharedNote from "@/components/SharedNote.vue";
-
+import ClientAVFrame from '../components/ClientAVFrame.vue'
+import { MdCollectionsOutlined } from "oh-vue-icons/icons";
+import { onDisconnect, removeClientStream, setupMedia, clientConfigData } from "@/services/streamService";
 // true if user is host
 const isHost = computed(() => {
   return useUserdataStore().isHost;
@@ -22,6 +24,12 @@ const username = computed(() => {
 });
 
 const mounted = ref(false);
+interface Cursor {
+  id: any;
+  username: string;
+  x_coord: Ref<number>;
+  y_coord: Ref<number>;
+}
 
 const peer = new Peer({
   host: "/",
@@ -36,7 +44,7 @@ const conns: any = [];
 // list of all peers
 const otherUsers = new Map();
 // list of all cursors
-const cursors: Ref<cursor[]> = ref([]);
+const cursors: Ref<Cursor[]> = ref([]);
 const cursorIds: string[] = [];
 // null while no file has been uploaded
 const file: Ref<Blob | null> = ref(null);
@@ -51,16 +59,10 @@ interface data {
   annotations?: any,
 }
 
-interface cursor {
-  id: any;
-  username: string;
-  x_coord: Ref<number>;
-  y_coord: Ref<number>;
-}
-
-let socket = null;
+let socket: Socket | null = null;
 
 onBeforeMount(() => {
+  
   // opens socket connection to backend
   socket = io(`${import.meta.env.VITE_PUBLIC_SOCKET}`, {
     transports: ['websocket', 'polling', 'flashsocket'],
@@ -69,6 +71,7 @@ onBeforeMount(() => {
 
   socket.on('connect', () => {
     console.log('Socket.IO connected with ID:', socket.id);
+    
   });
 
   socket.on('connect_error', (err) => {
@@ -121,6 +124,8 @@ onBeforeMount(() => {
         }
       }
     }
+
+    removeClientStream(id);
   });
 });
 
@@ -180,6 +185,7 @@ function peer_init() {
   peer.on("open", (id: string) => {
     console.log("Joining session.", sessionID.value, id, username.value);
     socket.emit("join_session", sessionID.value, id);
+    setupMedia(socket, username.value);
   });
 
   // when a user connects with you, initialize the connection
@@ -242,12 +248,18 @@ const isFile = computed(() => {
 });
 
 onBeforeUnmount(() => {
-  if (socket) socket.disconnect();
+  if (socket) {
+    onDisconnect(socket);
+    
+    socket.disconnect();
+  }
 });
+
 </script>
 
 <template>
   <div>
+    <h1 class="ml-2"><v-icon name='fa-users' class="scale-105"/> <span v-text="1 + otherUsers.size"/> Connected </h1>
     <CursorItem v-for="cursor in cursors" :username="cursor.username" :x_coord="cursor.x_coord" :y_coord="cursor.y_coord" style="z-index:100"/>
     <hr class="my-3" />
     <div class="flex flex-row m-5">
@@ -269,7 +281,10 @@ onBeforeUnmount(() => {
           </label>
         </div>
         <div id="top-side-item" class="m-auto">
-
+          <div class="flex flex-col gap-2 w-fit bg-slate-300 overflow-scroll h-[85vh]">
+              <!-- For looop  -->
+            <ClientAVFrame v-for="([key, data], index) in clientConfigData.entries()" :key="key" :data="data"/>
+          </div>
         </div>
         <!--
         <div id="bottom-side-item" class="min-h-[50vh] flex flex-col">
@@ -285,3 +300,4 @@ onBeforeUnmount(() => {
   height: calc(87.5vh - 80px);
 }
 </style>
+

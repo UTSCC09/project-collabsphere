@@ -8,3 +8,4 @@ Thumbs.db
 /httpRequests/
 # IDE folder
 .idea
+ssl/*.pem

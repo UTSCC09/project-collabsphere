@@ -59,6 +59,8 @@ function joinSession() {
 </script>
 
 <template>
+
+
   <main v-if="!isLoggedIn">
     <h1>You need an account to enjoy CollabSphere</h1>
     <LoginItem />
@@ -84,6 +86,6 @@ function joinSession() {
     <p class="text-red-500">{{sessionID_error}}</p>
 
     </div>
+    
   </main>
-
 </template>
