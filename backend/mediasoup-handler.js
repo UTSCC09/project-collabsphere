@@ -20,7 +20,7 @@ const ms_routerOptions = config.RouterOptions;
 
 let ms_worker;
 let ms_router;
-
+const listenIps = config.WebRtcTransportOptions.listenIps;
 const transports = new Map();
 const rooms = new Map();
 
@@ -147,10 +147,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			// If you are testing locally on Firefox
 			// I also received ICE stun server errors.
 			// Apparently Firefox does not support loopback compared to Chrome.
-			listenIps: [
-				{ ip: "0.0.0.0", announcedIp: "127.0.0.1" },
-				{ ip: "0.0.0.0", announcedIp: "localhost" },
-			],
+			listenIps: listenIps,
 
 			enableUdp: true,
 			enableTcp: true,

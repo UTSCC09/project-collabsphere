@@ -49,5 +49,13 @@
 			}
 		],
 		"maxBitrate": 500000
+	},
+
+	"WebRtcTransportOptions": {
+		"listenIps": [
+			{ "ip": "0.0.0.0", "announcedIp": "127.0.0.1" },
+			{ "ip": "0.0.0.0", "announcedIp": "localhost" },
+			{ "ip": "0.0.0.0", "announcedIp": "34.130.22.173" }
+		]
 	}
 }
