@@ -12,7 +12,6 @@ import { onDisconnect, removeClientStream, setupMedia, clientConfigData } from "
 import fetchWrapper from "@/utils/fetchWrapper.js";
 import { useNotificationStore } from "@/stores/notification";
 
-// true if user is host
 const isHost = ref(false);
 const hostId = ref(null);
 
@@ -64,6 +63,7 @@ interface data {
 
 let socket: Socket | null = null;
 
+// retrieves connection id of the current host
 async function getHostId() {
   await fetchWrapper(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}/host`,
     {
@@ -91,7 +91,6 @@ onBeforeMount(async () => {
 
   socket.on('connect', () => {
     console.log('Socket.IO connected with ID:', socket.id);
-
   });
 
   socket.on('connect_error', (err) => {
@@ -108,14 +107,12 @@ onBeforeMount(async () => {
 
   // when a host leaves, apply to be new host
   socket.on("host_left", () => {
-    console.log("Applying for host.");
     socket.emit("host_application", peer.id);
   });
 
   peer_init();
 
-  // when a user connects to this session, create a new connection
-  // and initialize it.
+  // when a user connects to this session, create a new connection and initialize it
   socket.on("user_connection", (id) => {
     console.log("Another user connected to the session.");
     const conn = peer.connect(id);
@@ -177,7 +174,6 @@ function connection_init(conn: Peer) {
     if (data.username) {
       otherUsers.get(conn.peer).username = data.username;
 
-      // ? This can be removed if you do not want to show the notification
       notificationstore.addNotification({message:`User ${data.username || "unknown"} connected`});
       return;
     }
@@ -244,7 +240,6 @@ function peer_init() {
 onMounted(() => {
   mounted.value = true;
 
-  // when mouse is moved, broadcast mouse position to all connections
   function sendCursor(
       e: MouseEvent,
       conns: any) {
@@ -305,7 +300,6 @@ onBeforeUnmount(() => {
     onDisconnect(socket);
   }
 });
-
 </script>
 
 <template>
