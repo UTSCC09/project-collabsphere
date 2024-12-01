@@ -107,11 +107,7 @@ onBeforeMount(async () => {
     socket.emit("host_application", peer.id);
   });
 
-  // TODO race condition. Running await getHostId() before causes connections to fail
   peer_init();
-
-  // hostId is needed before setup can continue
-  await getHostId();
 
   // when a user connects to this session, create a new connection
   // and initialize it.
@@ -163,7 +159,7 @@ function connection_init(conn: Peer) {
   const x_coord = ref(0);
   const y_coord = ref(0);
 
-  conn.on("data", (data: data) => {
+  conn.on("data", async (data: data) => {
     if (data.username) {
       otherUsers.get(conn.peer).username = data.username;
       return;
@@ -187,8 +183,10 @@ function connection_init(conn: Peer) {
     }
 
     // only accept file from host for security purposes
-    if (data.file && conn.peer === hostId.value) {
-      file.value = new Blob([data.file]);
+    if (data.file) {
+      await getHostId();
+      if (conn.peer === hostId.value)
+        file.value = new Blob([data.file]);
       return;
     }
 
@@ -211,7 +209,8 @@ function connection_init(conn: Peer) {
 function peer_init() {
   peer.on("open", (id: string) => {
     console.log("Joining session.", sessionID.value, id, username.value);
-    socket.emit("join_session", sessionID.value, id);
+    socket.emit("join_session", sessionID.value, id, async () => {
+    });
   });
 
   // when a user connects with you, initialize the connection

@@ -116,6 +116,7 @@ io.on("connection", (socket) => {
 
     const userId = jwt.verify(socket.request.headers.cookie.split('=')[1], process.env.JWT_SECRET).id;
     const session = await Session.findById(sessionId);
+    if (!session) return;
 
     // if current user is host, emit their connection id
     if (userId === session.host.toString()) {
@@ -131,6 +132,7 @@ io.on("connection", (socket) => {
 
     socket.on("host_application", async () => {
       const session = await Session.findById(sessionId);
+      if (!session) return;
       // !session.connId prevents a socket from emitting host_application while host exists
       // also, only allows the first to respond (typically the best internet speed)
       if (!session.connId) {
@@ -147,6 +149,8 @@ io.on("connection", (socket) => {
       socket.leave(sessionId);
 
       const session = await Session.findById(sessionId);
+      if (!session) return;
+
       if (userId === session.host.toString()) {
         session.connId = "";
         await session.save();
@@ -154,6 +158,7 @@ io.on("connection", (socket) => {
         // if no new host within 10 seconds, delete session
         setTimeout(async () => {
           const session = await Session.findById(sessionId);
+          if (!session) return;
           if (!session.connId) {
             await session.deleteOne();
             console.log("Deleted session: " + sessionId);
