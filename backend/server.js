@@ -118,14 +118,13 @@ io.on("connection", (socket) => {
 		const userId = jwt.verify(socket.request.headers.cookie.split("=")[1], process.env.JWT_SECRET).id;
 		const session = await Session.findById(sessionId);
 
-		// TODO remove for optimization
-		// if current user is host, emit their connection id
-		if (userId === session.host.toString()) {
-			session.connId = id;
-			await session.save();
-			// io instead of socket so the host also receives the message
-			io.to(sessionId).emit("new_host", id);
-		}
+    // if current user is host, emit their connection id
+    if (userId === session.host.toString()) {
+      session.connId = id;
+      await session.save();
+      // io instead of socket so the host also receives the message
+      io.to(sessionId).emit("new_host", id);
+    }
 
 		socket.on("note", (note) => {
 			socket.to(sessionId).emit("note", note);
@@ -148,20 +147,27 @@ io.on("connection", (socket) => {
 			socket.to(sessionId).emit("user_disconnection", id);
 			socket.leave(sessionId);
 
-			const session = await Session.findById(sessionId);
-			if (userId === session.host.toString()) {
-				session.connId = "";
-				await session.save();
-				socket.to(sessionId).emit("host_left");
-			}
+      const session = await Session.findById(sessionId);
+      if (userId === session.host.toString()) {
+        session.connId = "";
+        await session.save();
+        socket.to(sessionId).emit("host_left");
+        // if no new host within 10 seconds, delete session
+        setTimeout(async () => {
+          const session = await Session.findById(sessionId);
+          if (!session.connId) {
+            await session.deleteOne();
+            console.log("Deleted session: " + sessionId);
+          }
+        }, 10000);
+      }
+	  ms_client_disconnect(sessionId, id);
+  });
 
-			ms_client_disconnect(sessionId, id);
-		});
+  /* Media Soup */
+  ms_bind(socket, sessionId, id);
 
-		/* Media Soup */
-		ms_bind(socket, sessionId, id);
-
-		callback();
+  callback();
   });
 });
 
