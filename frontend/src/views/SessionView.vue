@@ -13,12 +13,6 @@ import fetchWrapper from "@/utils/fetchWrapper.js";
 const isHost = ref(false);
 const hostId = ref(null);
 
-// whether the current user is expected to be host
-// prevents host from calling isHostId without sacrificing security
-const expectHost = computed(() => {
-  return useUserdataStore().isHost;
-});
-
 const sessionID = computed(() => {
   return useUserdataStore().sessionID;
 });
@@ -106,16 +100,15 @@ onBeforeMount(async () => {
 
   // when a host leaves, apply to be new host
   socket.on("host_left", () => {
+    console.log("Applying for host.");
     socket.emit("host_application", peer.id);
   });
 
   // TODO race condition. Running await getHostId() before causes connections to fail
   peer_init();
 
-  if (!expectHost.value) {
-    // hostId is needed before setup can continue
-    await getHostId();
-  }
+  // hostId is needed before setup can continue
+  await getHostId();
 
   // when a user connects to this session, create a new connection
   // and initialize it.
@@ -304,7 +297,7 @@ onBeforeUnmount(() => {
           </Teleport>
         </div>
         <div v-if="isFile" id="viewer">
-          <DocumentReader v-if="file" :file="file" :conns="conns" ref="documentReaderRef" @sendAnnotations="sendAnnotations" @requestAnnotations="requestAnnotations"/>
+          <DocumentReader v-if="file" :file="file" ref="documentReaderRef" @sendAnnotations="sendAnnotations" @requestAnnotations="requestAnnotations"/>
         </div>
       </div>
       <div id="side-items" class="basis-1/3 ml-5">
