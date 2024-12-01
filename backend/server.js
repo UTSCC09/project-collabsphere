@@ -57,8 +57,6 @@ const io = new Server(httpsSocketServer, {
 
 httpsSocketServer.listen(3030);
 
-console.log("PRIVATE KEY PATH", process.env.SSL_PRIVATE_KEY_PATH);
-// const pServer = app.listen(1234);
 const peerServer = ExpressPeerServer(server, {
 	// debug: true,
 	// proxied: true,
@@ -69,51 +67,45 @@ const peerServer = ExpressPeerServer(server, {
 	//   key: config.key,
 	//   cert: config.cert
 	// },
-	// sslkey: `C:/Users/talba/Documents/Miscellaneous Shared/GitHub/project-collabsphere/ssl/privkey.pem`,
-	// sslcert: `C:/Users/talba/Documents/Miscellaneous Shared/GitHub/project-collabsphere/ssl/cert.pem`,
-  sslkey: process.env.SSL_PRIVATE_KEY_PATH,
-  sslcert: process.env.SSL_CERTIFICATE_PATH,
-	// sslkey: '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem',
-	// sslcert: '/etc/letsencrypt/live/collabsphere.xyz/cert.pem',
+	sslkey: process.env.SSL_PRIVATE_KEY_PATH || "/etc/letsencrypt/live/collabsphere.xyz/privkey.pem",
+	sslcert: process.env.SSL_CERTIFICATE_PATH || "/etc/letsencrypt/live/collabsphere.xyz/cert.pem",
 	generateClientId: customGenerationFunction,
 });
 
-
 app.use(peerServer);
 
-
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-  .then(() => console.log('MongoDB connected successfully'))
-  .catch((error) => console.error('MongoDB connection error:', error));
+mongoose
+	.connect(process.env.MONGODB_URI, {
+		useNewUrlParser: true,
+		useUnifiedTopology: true,
+	})
+	.then(() => console.log("MongoDB connected successfully"))
+	.catch((error) => console.error("MongoDB connection error:", error));
 
 // Routes
-app.use('/api', authRoutes);
-app.use('/api', sessionRoutes);
+app.use("/api", authRoutes);
+app.use("/api", sessionRoutes);
 
 // Error handling
 app.use((req, res, next) => {
-  res.status(404).json({ message: 'Route not found' });
+	res.status(404).json({ message: "Route not found" });
 });
 
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Internal server error' });
+	console.error(err.stack);
+	res.status(500).json({ message: "Internal server error" });
 });
 
 // only start the server if not running tests
-if (process.env.NODE_ENV !== 'test') {
-  const PORT = process.env.PORT || 4000;
-  server.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-
+if (process.env.NODE_ENV !== "test") {
+	const PORT = process.env.PORT || 4000;
+	server.listen(PORT, () => {
+		console.log(`Server running on http://localhost:${PORT}`);
+	});
 }
 
-import { ms_bind, ms_client_disconnect } from "./mediasoup-setup.js";
+import { ms_bind, ms_client_disconnect } from "./mediasoup-handler.js";
 
 io.on("connection", (socket) => {
 	socket.on("join_session", async (sessionId, id) => {

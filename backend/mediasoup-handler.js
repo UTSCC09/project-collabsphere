@@ -4,62 +4,19 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// Load config/mediasoup-config.json
+import config from "./config/mediasoup-config.json" assert { type: "json" };
+
 // https://mediasoup.org/documentation/v3/mediasoup/api/#WorkerSettings
 const workerSettings = {
-	logLevel: "warn",
-	logTags: ["info", "ice", "dtls", "rtp", "srtp", "rtcp", "rbe", "rtx"],
-	rtcMinPort: 40000,
-	rtcMaxPort: 49000,
+	...config.WorkerSettings,
+	// Add certificate and private key paths to the config
 	dtlsCertificateFile: process.env.SSL_CERTIFICATE_PATH,
 	dtlsPrivateKeyFile: process.env.SSL_PRIVATE_KEY_PATH,
 };
 
 // https://mediasoup.org/documentation/v3/mediasoup/api/#RouterOptions
-const ms_routerOptions = {
-	logLevel: "warn",
-	logTags: ["info", "ice", "dtls", "rtp", "srtp", "rtcp", "rbe", "rtx"],
-	rtcIPv4: true,
-	rtcIPv6: true,
-	mediaCodecs: [
-		{
-			kind: "audio",
-			mimeType: "audio/opus",
-			clockRate: 48000,
-			channels: 2,
-		},
-		{
-			kind: "audio",
-			mimeType: "audio/PCMU",
-			clockRate: 8000,
-			channels: 1,
-		},
-		{
-			kind: "video",
-			mimeType: "video/VP8",
-			clockRate: 90000,
-			parameters: {
-				"x-google-start-bitrate": 1000,
-			},
-		},
-		{
-			kind: "video",
-			mimeType: "video/VP9",
-			clockRate: 90000,
-		},
-		{
-			kind: "video",
-			mimeType: "video/H264",
-			clockRate: 90000,
-			parameters: {
-				"packetization-mode": 1,
-				"profile-level-id": "42e01f",
-				"level-asymmetry-allowed": 1,
-			},
-		},
-	],
-	// mediasoup per Peer max sending bitrate (in bps).
-	maxBitrate: 500000,
-};
+const ms_routerOptions = config.RouterOptions;
 
 let ms_worker;
 let ms_router;
@@ -478,7 +435,6 @@ const bind_mediasoup = (socket, sessionId, id) => {
 
 		console.log(`(pause-producer) called by ${label}(pr=${producerId})`);
 
-		console.log(room.producers.map((p) => p.id));
 		if (!producer) {
 			console.error("Producer not found");
 			callback({ error: "Producer not found" });
