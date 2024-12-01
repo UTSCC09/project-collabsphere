@@ -111,6 +111,9 @@ import { ms_bind, ms_client_disconnect } from "./mediasoup-handler.js";
 io.on("connection", (socket) => {
   console.log("Connection Request");
   socket.on("join_session", async (sessionId, id, callback) => {
+    // sanity check input
+    if (!mongoose.Types.ObjectId.isValid(sessionId)) return;
+
 		console.log("Received join request from " + id);
 		socket.join(sessionId);
 		socket.to(sessionId).emit("user_connection", id);
