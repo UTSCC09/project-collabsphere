@@ -134,7 +134,6 @@ io.on("connection", (socket) => {
       const session = await Session.findById(sessionId);
       // !session.tempHost only allows the first to respond (typically the best internet speed)
       // !session.connId prevents a socket from emitting host_application while host exists
-      console.log(session);
       if (!session.tempHost && !session.connId) {
         session.tempHost = userId;
         session.connId = id;
