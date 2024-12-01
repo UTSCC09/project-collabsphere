@@ -1,5 +1,5 @@
 <script setup lang="ts" type="module">
-import {computed, onMounted, ref, type Ref, type Component, onBeforeUnmount, onBeforeMount, watch} from "vue";
+import {computed, onMounted, ref, type Ref, type Component, onBeforeUnmount, onBeforeMount} from "vue";
 import { Peer } from "https://esm.sh/peerjs@1.5.4?bundle-deps"
 import { throttle } from 'throttle-debounce';
 import { io, Socket } from "socket.io-client";

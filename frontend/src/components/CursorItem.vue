@@ -22,19 +22,6 @@ const toColor = function(value: string): string {
   return colors[hash];
 }
 
-/*
-function updateMyCursor(point: number[]) {
-  elm.style.setProperty("transform", `translate2d(${point[0]}px, ${point[1]}px)`)
-}
-
-const pc = new PerfectCursor(updateMyCursor);
-
-watch(() => [props.x_coord.value, props.y_coord.value], () => {
-  pc.addPoint([props.x_coord, props.y_coord]);
-  pc.dispose();
-});
- */
-
 // calculate hex string using username
 const color = toColor(props.username);
 

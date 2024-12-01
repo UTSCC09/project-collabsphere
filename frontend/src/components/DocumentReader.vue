@@ -1,8 +1,8 @@
 <script setup lang="ts" type="module">
-import {onMounted} from 'vue';
+import { onMounted } from 'vue';
 // @ts-expect-error
 import { TsPdfViewer, TsPdfViewerOptions } from "ts-pdf";
-import {throttle} from "throttle-debounce";
+import { throttle } from "throttle-debounce";
 
 const props = defineProps({
   file: {
