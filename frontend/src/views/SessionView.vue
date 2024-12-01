@@ -213,8 +213,10 @@ function connection_init(conn: Peer) {
 function peer_init() {
   peer.on("open", (id: string) => {
     console.log("Joining session.", sessionID.value, id, username.value);
-    socket.emit("join_session", sessionID.value, id);
-    setupMedia(socket, username.value);
+    socket.emit("join_session", sessionID.value, id, () => {
+      setupMedia(socket, username.value);
+    });
+
   });
 
   // when a user connects with you, initialize the connection
@@ -291,6 +293,7 @@ onBeforeUnmount(() => {
     onDisconnect(socket);
     
     socket.disconnect();
+
   }
 });
 
