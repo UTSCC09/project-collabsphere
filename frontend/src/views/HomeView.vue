@@ -56,20 +56,15 @@ function joinSession() {
       sessionID_error.value = error.message
     })
 }
-
-
 </script>
-
 <template>
-
-
   <main v-if="!isLoggedIn">
     <h1>You need an account to enjoy CollabSphere</h1>
     <LoginItem />
   </main>
   <main v-else class="flex w-full lg:w-1/3 flex-1 ml-auto mr-auto items-center justify-center text-center">
     <div class="gap-2 flex flex-col">
-    <h1 class="text-2xl font-bold">Collaborate</h1>
+    <h1 class="text-2xl font-bold" style="display:inline-block">Collaborate</h1>
     <p class="text-xl">Host your own session or join a friend!</p>
     <br class="my-4"/>
     <button class="btn-and-icon"
@@ -84,10 +79,7 @@ function joinSession() {
     >
     <v-icon name="bi-box-arrow-in-right"/>Join</button>
   </div>
-
     <p class="text-red-500">{{sessionID_error}}</p>
-
     </div>
-    
   </main>
 </template>
