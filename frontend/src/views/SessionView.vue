@@ -7,10 +7,17 @@ import CursorItem from "@/components/CursorItem.vue";
 import DocumentReader from "@/components/DocumentReader.vue";
 import { useUserdataStore } from "@/stores/userdata";
 import SharedNote from "@/components/SharedNote.vue";
+import fetchWrapper from "@/utils/fetchWrapper.js";
 
 // true if user is host
 const isHost = ref(false);
 const hostId = ref(null);
+
+// whether the current user is expected to be host
+// prevents host from calling isHostId without sacrificing security
+const expectHost = computed(() => {
+  return useUserdataStore().isHost;
+});
 
 const sessionID = computed(() => {
   return useUserdataStore().sessionID;
@@ -59,7 +66,22 @@ interface cursor {
 
 let socket = null;
 
-onBeforeMount(() => {
+async function getHostId() {
+  await fetchWrapper(`${import.meta.env.VITE_PUBLIC_BACKEND}/api/session/${sessionID.value}/host`,
+    {
+      credentials: 'include',
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  )
+  .then((data: {hostId: string}) => {
+    hostId.value = data.hostId;
+  }).catch(() => {})
+}
+
+onBeforeMount(async () => {
   // opens socket connection to backend
   socket = io(`${import.meta.env.VITE_PUBLIC_SOCKET}`, {
     transports: ['websocket', 'polling', 'flashsocket'],
@@ -87,7 +109,13 @@ onBeforeMount(() => {
     socket.emit("host_application", peer.id);
   });
 
+  // TODO race condition. Running await getHostId() before causes connections to fail
   peer_init();
+
+  if (!expectHost.value) {
+    // hostId is needed before setup can continue
+    await getHostId();
+  }
 
   // when a user connects to this session, create a new connection
   // and initialize it.
@@ -101,17 +129,15 @@ onBeforeMount(() => {
       conn.send({username: username.value});
 
       // send file if it exists and current user is the host
-      if (isHost.value) {
-        if (file.value) {
-          const fileReader = new FileReader();
-          fileReader.onload = async () => {
-            conn.send({file: fileReader.result});
-          }
-          fileReader.readAsArrayBuffer(file.value);
+      if (isHost.value && file.value) {
+        const fileReader = new FileReader();
+        fileReader.onload = async () => {
+          conn.send({file: fileReader.result});
         }
-        // send notes
-        sharedNotesRef.value.transmit();
+        fileReader.readAsArrayBuffer(file.value);
       }
+      // send notes
+      sharedNotesRef.value.transmit();
     });
   });
 
@@ -164,7 +190,8 @@ function connection_init(conn: Peer) {
       }
     }
 
-    if (data.file) {
+    // only accept file from host for security purposes
+    if (data.file && conn.peer === hostId.value) {
       file.value = new Blob([data.file]);
       return;
     }
@@ -230,6 +257,16 @@ function sendAnnotations(annotations) {
   }
 }
 
+function requestAnnotations() {
+  // ask the host for annotations
+  for (const conn of conns) {
+    if (conn.peer === hostId.value) {
+      conn.send({request: "annotations"});
+      return;
+    }
+  }
+}
+
 function handleFileInput(e: Event) {
   if (!e.target) return ;
 
@@ -237,7 +274,7 @@ function handleFileInput(e: Event) {
   if (target.files) {
     file.value = target.files[0];
   }
-  console.log("Sending file to backend.");
+
   const fileReader = new FileReader();
   fileReader.onload = async () => {
     for (const conn of conns)
@@ -267,7 +304,7 @@ onBeforeUnmount(() => {
           </Teleport>
         </div>
         <div v-if="isFile" id="viewer">
-          <DocumentReader v-if="file" :file="file" :conns="conns" ref="documentReaderRef" @sendAnnotations="sendAnnotations"/>
+          <DocumentReader v-if="file" :file="file" :conns="conns" ref="documentReaderRef" @sendAnnotations="sendAnnotations" @requestAnnotations="requestAnnotations"/>
         </div>
       </div>
       <div id="side-items" class="basis-1/3 ml-5">

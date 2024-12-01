@@ -9,13 +9,9 @@ const props = defineProps({
     type: Blob,
     required: true,
   },
-  conns: {
-    type: Object,
-    required: true,
-  }
 });
 
-const emits = defineEmits(["sendAnnotations"]);
+const emits = defineEmits(["sendAnnotations", "requestAnnotations"]);
 
 let viewer = null;
 let current_annotations = [];
@@ -29,10 +25,9 @@ async function sendAnnotations() {
       if (current_annotation.uuid === annotation.uuid) return false;
     return true;
   });
-  console.log(annotations);
+
   if (annotations.length > 0) {
     current_annotations = current_annotations.concat(annotations);
-    console.log(current_annotations);
     // send the annotations to the other users
     emits("sendAnnotations", annotations);
   }
@@ -72,13 +67,7 @@ async function run(): Promise<void> {
   viewer = new TsPdfViewer(options);
   await viewer.openPdfAsync(props.file);
 
-  // TODO change random connection to host
-  // TODO technically a race condition but unlikely to ever be a problem
-    // e.g. this code is reached before the connection is established
-  // choose a random connection and ask for the annotations
-  if (props.conns[0]) {
-    props.conns[0].send({request: "annotations"});
-  }
+  emits("requestAnnotations");
 }
 
 onMounted(() => {
