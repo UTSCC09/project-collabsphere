@@ -41,8 +41,8 @@ function joinSession() {
       headers: {
         'Content-Type': 'application/json',
       },
-    }
-  ).then((data: {session: {_id: string}}) => {
+    })
+    .then((data: {session: {_id: string}}) => {
       if (!data.session || !data.session._id) {
         sessionID_error.value = 'Session not found'
         return
@@ -51,7 +51,10 @@ function joinSession() {
       userstore.joinSession(data.session._id)
       // Jump to session view
       router.push('/session')
-    }).catch(() => {})
+    })
+    .catch((error) => {
+      sessionID_error.value = error.message
+    })
 }
 
 

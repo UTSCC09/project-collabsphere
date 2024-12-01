@@ -10,10 +10,9 @@ const userstore = useUserdataStore()
 const notificationstore = useNotificationStore()
 
 const isLoggedIn = computed(() => userstore.isLoggedIn)
-const { login, logout } = userstore
+const { logout } = userstore
 
 const route = useRoute();
-const isTestSessionRoute = computed(() => route.path === '/session');
 const username = computed(() => userstore.username);
 
 const isHost = computed(() => userstore.isHost);

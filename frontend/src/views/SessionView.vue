@@ -10,6 +10,7 @@ import SharedNote from "@/components/SharedNote.vue";
 import ClientAVFrame from '../components/ClientAVFrame.vue'
 import { onDisconnect, removeClientStream, setupMedia, clientConfigData } from "@/services/streamService";
 import fetchWrapper from "@/utils/fetchWrapper.js";
+import { useNotificationStore } from "@/stores/notification";
 
 // true if user is host
 const isHost = ref(false);
@@ -50,6 +51,8 @@ const cursorIds: string[] = [];
 const file: Ref<Blob | null> = ref(null);
 const documentReaderRef: Ref<Component | null> = ref(null);
 const sharedNotesRef: Ref<Component | null> = ref(null);
+
+const notificationstore = useNotificationStore()
 
 interface data {
   x?: number,
@@ -139,7 +142,9 @@ onBeforeMount(async () => {
 
   // when a user leaves this session, remove their cursor
   socket.on("user_disconnection", (id) => {
+    if (otherUsers.get(id) === undefined) return;
     const index = conns.indexOf(otherUsers.get(id).conn);
+    const peer_username = otherUsers.get(id).username;
     otherUsers.delete(id);
 
     if (index !== -1) {
@@ -154,6 +159,8 @@ onBeforeMount(async () => {
     }
 
     removeClientStream(id);
+    // Add notifiaction
+    notificationstore.addNotification({message:`User ${peer_username || "unknown"} disconnected`});
   });
 });
 
@@ -166,8 +173,14 @@ function connection_init(conn: Peer) {
   const y_coord = ref(0);
 
   conn.on("data", (data: data) => {
+    // reject if conn.peer is not in otherUsers
+    if (!otherUsers.has(conn.peer)) return;
+    
     if (data.username) {
       otherUsers.get(conn.peer).username = data.username;
+      
+      // ? This can be removed if you do not want to show the notification
+      notificationstore.addNotification({message:`User ${data.username || "unknown"} connected`});
       return;
     }
 
@@ -290,10 +303,8 @@ const isFile = computed(() => {
 
 onBeforeUnmount(() => {
   if (socket) {
-    onDisconnect(socket);
-    
     socket.disconnect();
-
+    onDisconnect(socket);
   }
 });
 
