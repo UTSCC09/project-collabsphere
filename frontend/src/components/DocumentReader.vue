@@ -88,7 +88,7 @@ defineExpose({
 #pageContainer {
   border: 1px solid #ccc !important;
   width: 100%;
-  height: calc(93.5vh - 80px);
+  height: calc(90vh - 80px);
   overflow-y: scroll;
 }
 </style>

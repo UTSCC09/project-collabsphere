@@ -91,7 +91,7 @@ onBeforeMount(async () => {
 
   socket.on('connect', () => {
     console.log('Socket.IO connected with ID:', socket.id);
-    
+
   });
 
   socket.on('connect_error', (err) => {
@@ -170,13 +170,13 @@ function connection_init(conn: Peer) {
   const x_coord = ref(0);
   const y_coord = ref(0);
 
-  conn.on("data", (data: data) => {
+  conn.on("data", async (data: data) => {
     // reject if conn.peer is not in otherUsers
     if (!otherUsers.has(conn.peer)) return;
 
     if (data.username) {
       otherUsers.get(conn.peer).username = data.username;
-      
+
       // ? This can be removed if you do not want to show the notification
       notificationstore.addNotification({message:`User ${data.username || "unknown"} connected`});
       return;
@@ -348,7 +348,7 @@ onBeforeUnmount(() => {
 </template>
 <style scoped>
 #notes {
-  height: calc(93.5vh - 80px);
+  height: calc(90vh - 80px);
 }
 </style>
 
