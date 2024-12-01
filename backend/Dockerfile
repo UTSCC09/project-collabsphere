@@ -2,11 +2,11 @@
 FROM node:22
 
 # Create app directory
-WORKDIR /usr/src/app
+WORKDIR /usr/src/app/backend
 
 # Install app dependencies
 COPY package*.json ./
-RUN npm install
+RUN npm i --force --loglevel verbose --no-audit
 
 # Bundle app source
 COPY . .
