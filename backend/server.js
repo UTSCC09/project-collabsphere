@@ -117,7 +117,6 @@ io.on("connection", (socket) => {
     const userId = jwt.verify(socket.request.headers.cookie.split('=')[1], process.env.JWT_SECRET).id;
     const session = await Session.findById(sessionId);
 
-    // TODO remove for optimization
     // if current user is host, emit their connection id
     if (userId === session.host.toString()) {
       session.connId = id;

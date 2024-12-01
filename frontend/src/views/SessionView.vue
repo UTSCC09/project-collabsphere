@@ -72,7 +72,10 @@ async function getHostId() {
   )
   .then((data: {hostId: string}) => {
     hostId.value = data.hostId;
-  }).catch(() => {})
+  }).catch(() => {
+    // repeat while host is not available
+    getHostId();
+  })
 }
 
 onBeforeMount(async () => {
@@ -107,7 +110,6 @@ onBeforeMount(async () => {
   // TODO race condition. Running await getHostId() before causes connections to fail
   peer_init();
 
-  // TODO keep requesting just in case first request was between host swap
   // hostId is needed before setup can continue
   await getHostId();
 
