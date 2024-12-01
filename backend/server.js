@@ -151,6 +151,14 @@ io.on("connection", (socket) => {
         session.connId = "";
         await session.save();
         socket.to(sessionId).emit("host_left");
+        // if no new host within 10 seconds, delete session
+        setTimeout(async () => {
+          const session = await Session.findById(sessionId);
+          if (!session.connId) {
+            await session.deleteOne();
+            console.log("Deleted session: " + sessionId);
+          }
+        }, 10000);
       }
     });
   });
