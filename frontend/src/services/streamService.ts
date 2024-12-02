@@ -275,24 +275,27 @@ async function sendMyVideoTracks(
   stream: MediaStream,
   producerTransport: mediasoup.types.Transport,
 ) {
-  if (stream && stream.getVideoTracks().length > 0) {
-    const videoTrack = stream?.getVideoTracks()[0]
-
-    const video_payload = {
-      ...media_configs,
-      track: videoTrack,
-      kind: 'video',
-      appData: { username },
-    }
-
-    const prod_trans = await producerTransport.produce(video_payload)
-    myVideoProducerID = prod_trans.id
-    if (prod_trans.paused) {
-      prod_trans.resume()
-    }
-
-    log('Track ID:', prod_trans.id)
+  if (!stream || (stream && stream.getVideoTracks().length == 0)) {
+    console.error('No video track found')
+    return
   }
+
+  const videoTrack = stream?.getVideoTracks()[0]
+
+  const video_payload = {
+    ...media_configs,
+    track: videoTrack,
+    kind: 'video',
+    appData: { username },
+  }
+
+  const prod_trans = await producerTransport.produce(video_payload)
+  if (prod_trans.paused) {
+    prod_trans.resume()
+  }
+
+  log('Track ID:', prod_trans.id)
+  return prod_trans.id
 }
 
 async function sendMyAudioTracks(
@@ -300,11 +303,11 @@ async function sendMyAudioTracks(
   producerTransport: mediasoup.types.Transport,
 ) {
   // Check has audio
-  if (stream && stream.getAudioTracks().length == 0) {
+  if (!stream || (stream && stream.getAudioTracks().length == 0)) {
+    console.error('No audio track found')
     return
   }
 
-  log('Audio track found')
   const audioTrack = stream?.getAudioTracks()[0]
   const audio_payload = {
     track: audioTrack,
@@ -313,10 +316,10 @@ async function sendMyAudioTracks(
   }
 
   const audio_prod_trans = await producerTransport.produce(audio_payload)
-  myAudioProducerID = audio_prod_trans.id
   if (audio_prod_trans.paused) {
     audio_prod_trans.resume()
   }
+  return audio_prod_trans.id
 }
 
 /*  Feed video and audio into producer transport.
@@ -350,8 +353,10 @@ async function initializeStreams(
     const stream = await retrieveLocalStream()
 
     if (stream) {
-      sendMyVideoTracks(stream, producerTransport)
-      sendMyAudioTracks(stream, producerTransport)
+      myVideoProducerID =
+        (await sendMyVideoTracks(stream, producerTransport)) ?? ''
+      myAudioProducerID =
+        (await sendMyAudioTracks(stream, producerTransport)) ?? ''
     } else {
       console.error('No stream found')
     }

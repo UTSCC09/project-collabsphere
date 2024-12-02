@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, type Ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import type { Socket } from 'socket.io-client'
+import ClientAVAudioBorder from './ClientAVAudioBorder.vue'
 
 export interface ClientStreamData {
   id: string
@@ -17,6 +18,7 @@ export interface ClientStreamData {
   toggleVideo?: () => void
   connected?: boolean
 }
+const video = ref<HTMLVideoElement | null>(null);
 
 const props = defineProps<{
     data: ClientStreamData
@@ -40,18 +42,7 @@ const createBlackFrame = () => {
     return canvas.captureStream().getVideoTracks()[0];
 };
 
-let audioContext: AudioContext;
-let analyser: AnalyserNode;
-
-try {
-    audioContext = new AudioContext();
-    analyser = audioContext.createAnalyser();
-} catch (e) {
-    console.log(e)
-}
-
 const pause_resume_cb = (data : {error: string}) => {
-
     if (data && data.error) {
         console.error(data.error)
     }
@@ -106,40 +97,6 @@ function toggleVideo() {
     }
 }
 
-const isSpeaking = ref(false);
-const video = ref<HTMLVideoElement | null>(null);
-let mediaStreamSource;
-const FFT_SIZE = 256;
-
-watch( () => analyser, (newVal) => {
-    if (!analyser) return;
-
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-    function checkAudioActivity() {
-        if (!analyser) return;
-
-        analyser.getByteTimeDomainData(dataArray);
-
-        // Calculate the root mean square (RMS) volume
-        let sum = 0;
-        for (const element of dataArray) {
-            const value = (element - 128) / 128;
-            sum += value * value;
-        }
-
-        
-        const volume = Math.sqrt(sum / dataArray.length);
-
-        const threshold = 0.01;
-        isSpeaking.value = volume > threshold;
-
-        requestAnimationFrame(checkAudioActivity); // Continuous monitoring
-    }
-
-    checkAudioActivity();
-});
-
 watch(() => props.data.videoDisabled, (newVal) => {
     props.data.stream.getVideoTracks().forEach((track) => {
         track.enabled = !props.data.videoDisabled;
@@ -157,16 +114,6 @@ watch(() => props.data.videoDisabled, (newVal) => {
 })
 
 watch(() => props.data.audioDisabled, (newVal) => {
-    // Resume audio context
-    if (!props.data.audioDisabled) {
-        audioContext = new AudioContext();
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = FFT_SIZE;
-        mediaStreamSource = audioContext.createMediaStreamSource(props.data.stream);
-        mediaStreamSource.connect(analyser);
-    } else {
-        audioContext && audioContext.close();
-    }
     props.data.stream.getAudioTracks().forEach((track) => {
         track.enabled = !props.data.audioDisabled;
     });
@@ -175,16 +122,13 @@ watch(() => props.data.audioDisabled, (newVal) => {
 watch(() => props.data.stream, (newStream) => {
     if (video.value) {
         video.value.srcObject = newStream;
+        
+        if (props.data.isLocal) {
+            props.data.stream.getAudioTracks().forEach((track) => {
+                track.enabled = false;
+            });
+        }
 
-        props.data.stream.getAudioTracks().forEach((track) => {
-            track.enabled = false;
-        });
-
-        audioContext = new AudioContext();
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = FFT_SIZE;
-        mediaStreamSource = audioContext.createMediaStreamSource(props.data.stream);
-        mediaStreamSource.connect(analyser);
     }
 })
 
@@ -203,21 +147,24 @@ onMounted(async () => {
     }
 })
 
+
 </script>
 
 <template>
     <div class="bg-black w-64 text-white rounded-md overflow-clip relative " >
-        <div :class="['absolute z-[110] w-full h-full border-blue-500 box-border transition-all pointer-events-none', {'border-4': isSpeaking}]"></div>
-        
+        <ClientAVAudioBorder
+            :stream="props.data.stream"
+            :audioProducerId="props.data.audioProducerId"
+        />
         <button class="bg-black z-[50] w-full h-full hover:bg-slate-500" v-if="props.data.isLocal && !props.data.connected"
         :onclick="props.data.joinCall"
         >
         Join Call
-    </button>
+        </button>
         <!-- <ClientAVMenu class="absolute z-[100] top-2 right-2"/> -->
 
         <div class="absolute w-full h-full flex z-[30] items-center justify-center gap-5">
-            
+        
             <v-icon v-if="props.data.videoDisabled" 
                 name="bi-camera-video-off-fill" 
                 class=" text-red-500 scale-150"/>
