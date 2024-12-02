@@ -108,9 +108,12 @@ export const oAuthSignin = async (req, res) => {
       throw new Error(error);
     });
 
-    // TODO how to use userid
     const payload = ticket.getPayload();
     const userid = payload['sub'];
+
+    if (userid !== user.userid) {
+      throw new Error("Token id does not match user.");
+    }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
