@@ -184,9 +184,9 @@ const isAuthDisabled = computed(() => {
 });
 
 const client = google.accounts.oauth2.initTokenClient({
-  client_id: import.meta.env.GOOGLE_CLIENT_ID,
+  client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
   scope: 'https://www.googleapis.com/auth/userinfo.email',
-  callback: (response) => {
+  callback: async (response) => {
     if (google.accounts.oauth2.hasGrantedAnyScope(response, 'https://www.googleapis.com/auth/userinfo.email')) {
       token = response;
       email.value = response.userinfo.email;
