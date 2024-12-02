@@ -119,65 +119,100 @@ if (process.env.NODE_ENV !== "test") {
 
 import { ms_bind, ms_client_disconnect } from "./mediasoup-handler.js";
 
+function getCookie(raw_cookie, name) {
+	// Get cookie 'token' from request headers
+	if (!raw_cookie) {
+		console.log("No cookie found");
+		return;
+	}
+
+	const cookies = raw_cookie.split(";");
+	for (let cookie in cookies) {
+		const c = cookies[cookie].split("=");
+		if (c[0].trim() === name) {
+			return c[1];
+		}
+	}
+
+	return "";
+}
+
 io.on("connection", (socket) => {
-  console.log("Connection Request");
-  socket.on("join_session", async (sessionId, id, callback) => {
-    // sanity check input
-    if (!mongoose.Types.ObjectId.isValid(sessionId)) return;
+	const token = getCookie(socket.request.headers.cookie, "token");
+	if (!token) {
+		console.log("No token found");
+		return;
+	}
+
+	console.log("Connection Request");
+	socket.on("join_session", async (sessionId, id, callback) => {
+		// sanity check input
+		if (!mongoose.Types.ObjectId.isValid(sessionId)) return;
 
 		console.log("Received join request from " + id);
 		socket.join(sessionId);
 		socket.to(sessionId).emit("user_connection", id);
 
-    const userId = jwt.verify(socket.request.headers.cookie.split('=')[1], process.env.JWT_SECRET).id;
-    await Session.findOneAndUpdate({_id: sessionId, host: userId}, {connId: id}, {new: false, sanitizeFilter: true})
-    .then(doc => {
-      if (!doc) return;
-      // io instead of socket so the host also receives the message
-      io.to(sessionId).emit("new_host", id);
-    });
+		getCookie(socket.request.headers.cookie, "token");
 
-    socket.on("note", (note) => {
-      socket.to(sessionId).emit("note", note);
-    });
+		const userId = jwt.verify(token, process.env.JWT_SECRET).id;
+		await Session.findOneAndUpdate(
+			{ _id: sessionId, host: userId },
+			{ connId: id },
+			{ new: false, sanitizeFilter: true }
+		).then((doc) => {
+			if (!doc) return;
+			// io instead of socket so the host also receives the message
+			io.to(sessionId).emit("new_host", id);
+		});
 
-    socket.on("host_application", async () => {
-      await Session.findOneAndUpdate({_id: sessionId, connId: ''}, {host: userId, connId: id}, {new: false, sanitizeFilter: true})
-      .then(doc => {
-        if (!doc) return;
-        // io instead of socket so the host also receives the message
-        io.emit("new_host", id);
-      });
-    });
+		socket.on("note", (note) => {
+			socket.to(sessionId).emit("note", note);
+		});
 
-    socket.on("disconnect", async () => {
-      socket.to(sessionId).emit("user_disconnection", id);
-      socket.leave(sessionId);
-      ms_client_disconnect(sessionId, id);
+		socket.on("host_application", async () => {
+			await Session.findOneAndUpdate(
+				{ _id: sessionId, connId: "" },
+				{ host: userId, connId: id },
+				{ new: false, sanitizeFilter: true }
+			).then((doc) => {
+				if (!doc) return;
+				// io instead of socket so the host also receives the message
+				io.emit("new_host", id);
+			});
+		});
 
-      await Session.findOneAndUpdate({_id: sessionId, host: userId}, {connId: ''}, {new: false, sanitizeFilter: true})
-      .then(doc => {
-        if (!doc) return;
+		socket.on("disconnect", async () => {
+			socket.to(sessionId).emit("user_disconnection", id);
+			socket.leave(sessionId);
+			ms_client_disconnect(sessionId, id);
 
-        socket.to(sessionId).emit("host_left");
+			await Session.findOneAndUpdate(
+				{ _id: sessionId, host: userId },
+				{ connId: "" },
+				{ new: false, sanitizeFilter: true }
+			).then((doc) => {
+				if (!doc) return;
 
-        // if no new host within 10 seconds, delete session
-        setTimeout(async () => {
-          const session = await Session.findById(sessionId);
-          if (!session) return;
-          if (!session.connId) {
-            await session.deleteOne();
-            console.log("Deleted session: " + sessionId);
-          }
-        }, 10000);
-      });
-    });
-    
-    /* Media Soup */
-    ms_bind(socket, sessionId, id);
+				socket.to(sessionId).emit("host_left");
 
-    callback();
-  });
+				// if no new host within 10 seconds, delete session
+				setTimeout(async () => {
+					const session = await Session.findById(sessionId);
+					if (!session) return;
+					if (!session.connId) {
+						await session.deleteOne();
+						console.log("Deleted session: " + sessionId);
+					}
+				}, 10000);
+			});
+		});
+
+		/* Media Soup */
+		ms_bind(socket, sessionId, id);
+
+		callback();
+	});
 });
 
 // server.listen(3030);

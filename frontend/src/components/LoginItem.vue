@@ -291,7 +291,7 @@ const client = google.accounts.oauth2.initTokenClient({
         <input v-else type="submit" class="btn" value="Sign in" />
       </form>
       <p class="text-center mt-2 mb-2">or</p>
-      <img src="./icons/web_light_rd_SI.svg" alt="Sign in with Google" class="justify-self-center hover:opacity-75" @click="client.requestAccessToken"/>
+      <img src="./icons/web_light_rd_SI.svg" alt="Sign in with Google" class="ml-auto mr-auto hover:opacity-75" @click="client.requestAccessToken"/>
       <p class="mt-10 text-center text-sm text-gray-500">
         Not a member?
         <a href="#" class="a-href" @click="status = 'Sign up'">Sign up</a>

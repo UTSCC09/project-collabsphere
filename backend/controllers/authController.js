@@ -95,16 +95,10 @@ export const oAuthSignup = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // since there is no password, salt and hash are empty strings
-    const salt = ''
-    const hash = ''
-
     const user = new User({
-      username: username,
-      email: email,
-      hash: hash,
-      salt: salt,
-    });
+		username: username,
+		email: email,
+	});
 
     await user.save();
 
