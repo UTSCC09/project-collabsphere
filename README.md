@@ -1,5 +1,40 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/DnqlZtdt)
+## Collabsphere
+Collabsphere is a collaborative platform for users that hosts online study sessions for students and teachers. Collabsphere not only supports PDF sharing, but also live annotations, notes, video, audio and cursors.
 
-Test this app by visiting the following URL:
+__None of your non-account data is stored on the backend__, with all data being sent between users using WebRTC. Because of this, there must always be a user in the session to store the data.
 
+### Live demo
 [https://collabsphere.xyz](https://collabsphere.xyz)
+
+## Getting started
+### Frontend
+First, you need to initialize the environment variables. Create a .env file in the frontend folder. To run the application non-locally, change VITE_PUBLIC_BACKEND and VITE_PUBLIC_SOCKET. VITE_SSL_PRIVATE_KEY_PATH and VITE_SSL_CERTIFICATE_PATH are only needed for HTTPS.
+```
+VITE_PUBLIC_BACKEND=https://localhost:4000
+VITE_PUBLIC_SOCKET=https://localhost:3030
+VITE_SSL_PRIVATE_KEY_PATH=pathToPrivateKey.pem
+VITE_SSL_CERTIFICATE_PATH=pathToCertificate.pem
+```
+To run the frontend locally:
+```
+// in frontend folder
+npm install
+npm run dev
+```
+
+### Backend
+
+First, you need to initialize the environment variables. Create a .env file in the backend folder. To run the application non-locally, change FRONTEND.
+```
+MONGODB_URI=yourMongoDBURI
+JWT_SECRET=yourJWTSecret
+FRONTEND=https://localhost:5173
+```
+To run the backend locally:
+```
+// in backend folder
+npm install
+npm run start
+```
+
+### Deployment with Docker
