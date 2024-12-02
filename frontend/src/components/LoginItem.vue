@@ -189,13 +189,28 @@ const client = google.accounts.oauth2.initTokenClient({
   callback: async (response) => {
     if (google.accounts.oauth2.hasGrantedAnyScope(response, 'https://www.googleapis.com/auth/userinfo.email')) {
       token = response;
-      email.value = response.userinfo.email;
 
       // try to sign in with the token
       response_error.value = ''
       processing.value = true
       try {
-        const res = await fetch(
+        let res = await fetch(
+          'https://www.googleapis.com/oauth2/v2/userinfo?access_token=' + token.access_token,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (res.ok) {
+          const json = await res.json();
+          console.log(json);
+          email.value = json.email;
+        }
+
+        res = await fetch(
           `${import.meta.env.VITE_PUBLIC_BACKEND}/api/oauth-signin`,
           {
             method: 'POST',
