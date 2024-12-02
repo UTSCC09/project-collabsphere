@@ -80,7 +80,6 @@ async function signin() {
       }
     }
     const json = await response.json()
-    console.log(json)
     const { username, email: resEmail } = json
 
     userstore.setUsername(username)
@@ -95,10 +94,6 @@ async function signin() {
 }
 
 async function signup() {
-  if (password.value !== cpassword.value) {
-    console.log('Passwords do not match')
-    return
-  }
   try {
     response_error.value = ''
     processing.value = true
