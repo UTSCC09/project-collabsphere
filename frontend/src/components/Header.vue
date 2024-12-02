@@ -50,8 +50,13 @@ onMounted(async () => {
             case "TypeError: Failed to fetch":
                 message = "Failed to connect to server";
                 break;
+            case "Access token is missing or invalid":
+                return;
+                
             case "Invalid token":
                 message = "Not authenticated. Please log in again";
+                router.push('/');
+
                 break;
             default:
                 router.push('/');
