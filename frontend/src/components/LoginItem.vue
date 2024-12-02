@@ -194,23 +194,7 @@ const client = google.accounts.oauth2.initTokenClient({
       response_error.value = ''
       processing.value = true
       try {
-        let res = await fetch(
-          'https://www.googleapis.com/oauth2/v2/userinfo?access_token=' + token.access_token,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        if (res.ok) {
-          const json = await res.json();
-          console.log(json);
-          email.value = json.email;
-        }
-
-        res = await fetch(
+        const res = await fetch(
           `${import.meta.env.VITE_PUBLIC_BACKEND}/api/oauth-signin`,
           {
             method: 'POST',
@@ -219,7 +203,6 @@ const client = google.accounts.oauth2.initTokenClient({
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              email: email.value,
               OAuthToken: response,
             }),
           },

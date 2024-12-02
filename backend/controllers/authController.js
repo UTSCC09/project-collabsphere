@@ -8,6 +8,26 @@ const usernameRegex = /^[ A-Za-z0-9_@./#&+!-]{8,20}$/;
 
 const client = new OAuth2Client();
 
+// makes Google API request for access token and returns email
+async function validateAccessToken(token) {
+  const response = await fetch(
+    'https://www.googleapis.com/oauth2/v2/userinfo?access_token=' + token.access_token,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (response.ok) {
+    const json = await response.json();
+    return json.email;
+  } else {
+    return null;
+  }
+}
+
 // user signup
 export const signup = async (req, res) => {
     const { username, email, password } = req.body;
@@ -57,7 +77,7 @@ export const signup = async (req, res) => {
 
 // OAuth signup
 export const oAuthSignup = async (req, res) => {
-  const { username, email, OAuthToken } = req.body;
+  const { username, OAuthToken } = req.body;
 
   // validate username
   if (!usernameRegex.test(username)) {
@@ -65,16 +85,10 @@ export const oAuthSignup = async (req, res) => {
   }
 
   try {
-    // check OAuthToken for validity
-    const ticket = await client.verifyIdToken({
-      idToken: OAuthToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    }).catch((error) => {
-      throw new Error(error);
-    });
-
-    const payload = ticket.getPayload();
-    const userid = payload['sub'];
+    const email = validateAccessToken(OAuthToken);
+    if (!email) {
+      throw new Error('OAuthToken is missing or invalid');
+    }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -152,9 +166,14 @@ export const signin = async (req, res) => {
 
 // OAuth signin
 export const oAuthSignin = async (req, res) => {
-  const { email, OAuthToken } = req.body;
+  const { OAuthToken } = req.body;
 
   try {
+    const email = validateAccessToken(OAuthToken);
+    if (!email) {
+      throw new Error('OAuthToken is missing or invalid');
+    }
+
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
