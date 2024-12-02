@@ -120,6 +120,10 @@ onBeforeMount(async () => {
     hostId.value = id;
     if (id === peer.id) {
       isHost.value = true;
+      notificationstore.addNotification({message:"You are the new host"});
+    } else {
+      const newHostUsername = otherUsers.get(id)?.username || "unknown";
+      notificationstore.addNotification({message:"Host changed to " + newHostUsername});
     }
   });
 

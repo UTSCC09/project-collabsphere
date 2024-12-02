@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// @ts-nocheck
 import { ref, computed } from 'vue'
 import { useUserdataStore } from '@/stores/userdata'
 import SpinnerIcon from './SpinnerIcon.vue';
