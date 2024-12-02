@@ -85,7 +85,7 @@ export const oAuthSignup = async (req, res) => {
   }
 
   try {
-    const email = validateAccessToken(OAuthToken);
+    const email = await validateAccessToken(OAuthToken);
     if (!email) {
       throw new Error('OAuthToken is missing or invalid');
     }
@@ -102,7 +102,6 @@ export const oAuthSignup = async (req, res) => {
     const user = new User({
       username: username,
       email: email,
-      userid: userid,
       hash: hash,
       salt: salt,
     });
@@ -169,7 +168,7 @@ export const oAuthSignin = async (req, res) => {
   const { OAuthToken } = req.body;
 
   try {
-    const email = validateAccessToken(OAuthToken);
+    const email = await validateAccessToken(OAuthToken);
     if (!email) {
       throw new Error('OAuthToken is missing or invalid');
     }
@@ -177,21 +176,6 @@ export const oAuthSignin = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
-    }
-
-    // check OAuthToken for validity
-    const ticket = await client.verifyIdToken({
-      idToken: OAuthToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    }).catch((error) => {
-      throw new Error(error);
-    });
-
-    const payload = ticket.getPayload();
-    const userid = payload['sub'];
-
-    if (userid !== user.userid) {
-      throw new Error("Token id does not match user.");
     }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
