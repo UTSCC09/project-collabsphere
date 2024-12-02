@@ -9,3 +9,4 @@ Thumbs.db
 # IDE folder
 .idea
 ssl/*.pem
+.env
