@@ -133,6 +133,46 @@ async function signup() {
   processing.value = false
 }
 
+async function oauth_signup() {
+  try {
+    response_error.value = ''
+    processing.value = true
+    const response = await fetch(
+      `${import.meta.env.VITE_PUBLIC_BACKEND}/api/oauth-signup`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: username.value,
+          email: email.value,
+        }),
+      },
+    )
+
+    if (!response.ok) {
+      try {
+        const json = await response.json()
+        response_error.value = json.message || 'Error signing up'
+      } finally {
+        throw new Error(`Response status: ${response.status}`)
+      }
+    }
+    const json = await response.json()
+
+    const { username: resUsername, email: resEmail } = json
+
+    userstore.setUsername(resUsername)
+    userstore.setEmail(resEmail)
+    userstore.login()
+  } catch (error) {
+    console.log(error)
+  }
+
+  processing.value = false
+}
+
 const isDisabled = computed(() => {
   return !(reg.test(username.value) && reg.test(password.value) && password.value === cpassword.value);
 });
@@ -146,8 +186,10 @@ const client = google.accounts.oauth2.initTokenClient({
   scope: 'https://www.googleapis.com/auth/userinfo.email',
   callback: (response) => {
     if (google.accounts.oauth2.hasGrantedAnyScope(response, 'https://www.googleapis.com/auth/userinfo.email')) {
-      const email = response.userinfo.email;
+      email.value = response.userinfo.email;
 
+      response_error.value = ''
+      processing.value = true
       try {
         const res = await fetch(
           `${import.meta.env.VITE_PUBLIC_BACKEND}/api/oauth-signin`,
@@ -158,31 +200,37 @@ const client = google.accounts.oauth2.initTokenClient({
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              email: email,
+              email: email.value,
               OAuthToken: response,
             }),
           },
         );
 
-        // sign in
-        if (res.ok) {
-          const json = await res.json();
-          const { username, email: resEmail } = json;
-
-          userstore.setUsername(username);
-          userstore.setEmail(resEmail);
-          userstore.login();
-          return;
-        }
-
-        if (response.status === 404) {
+        if (res.status === 404) {
           status.value = 'Choose your display name';
-          // on submit, fetch and check if username is already in use
-          // if not, add user to database with token to verify and sign in
         }
+
+        if (!res.ok) {
+          try {
+            const json = await res.json()
+            response_error.value = json.message || 'Error signing up'
+          } finally {
+            throw new Error(`Response status: ${res.status}`)
+          }
+        }
+
+        const json = await res.json();
+        const { username, email: resEmail } = json;
+
+        userstore.setUsername(username);
+        userstore.setEmail(resEmail);
+        userstore.login();
+        return;
       } catch (error) {
         console.log(error)
       }
+
+      processing.value = false
     }
   },
 });
@@ -351,24 +399,28 @@ const client = google.accounts.oauth2.initTokenClient({
       v-else-if="status === 'Choose your display name'"
       class="mt-10 sm:mx-auto sm:w-full sm:max-w-sm"
     >
-      <div class="mt-2 mb-2">
-        <input
-          name="username"
-          @keyup="validate_username"
-          v-model="username"
-          autocomplete="username"
-          placeholder="display name"
-          required
-          class="form-input"
-        />
-      </div>
-      <p id="regex-error" class="text-red-400">{{ username_error }}</p>
-      <input
-        type="submit"
-        class="btn"
-        :disabled="isAuthDisabled"
-        value="Complete registration"
-      />
+      <form class="space-y-6" @submit.prevent="oauth_signup">
+        <div>
+          <div class="mt-2 mb-2">
+            <input
+              name="username"
+              @keyup="validate_username"
+              v-model="username"
+              autocomplete="username"
+              placeholder="display name"
+              required
+              class="form-input"
+            />
+          </div>
+          <p id="regex-error" class="text-red-400">{{ username_error }}</p>
+          <input
+            type="submit"
+            class="btn"
+            :disabled="isAuthDisabled"
+            value="Complete registration"
+          />
+        </div>
+      </form>
     </div>
   </div>
 </template>
