@@ -47,8 +47,12 @@ function validate_username() {
 
   if (usernameRegex.test(username.value)) {
     username_error.value = ''
+  } else if (username.value.length < 8) {
+    username_error.value = 'Username must have at least 8 characters.'
+  } else if (username.value.length > 20) {
+    username_error.value = 'Username must have at most 20 characters.'
   } else {
-    username_error.value = 'Username must be 8-20 characters and can only contain letters, numbers, and certain symbols.'
+    username_error.value = 'Characters can be alphanumeric or _@./#&+!-.'
   }
 }
 
@@ -201,7 +205,10 @@ const isDisabled = computed(() => {
     >
       <form class="space-y-6" @submit.prevent="signup">
         <div>
-          <label for="display" class="form-label">Display name</label>
+          <div class="flex items-center justify-between">
+            <label for="display" class="form-label">Display name</label>
+            <p id="regex-error" class="text-red-400 text-xs">{{ username_error }}</p>
+          </div>
 
           <div class="mt-2">
             <input
@@ -215,7 +222,6 @@ const isDisabled = computed(() => {
               class="form-input"
               />
             </div>
-            <p id="regex-error" class="text-red-400">{{ username_error }}</p>
         </div>
 
         <div>
