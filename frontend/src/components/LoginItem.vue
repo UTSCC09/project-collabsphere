@@ -26,7 +26,7 @@ const processing = ref(false)
 
 function validate_password() {
   if (password.value.length < 8) {
-    regex_error.value = 'Password must be > 8 characters'
+    regex_error.value = 'Password must be ≥ 8 characters'
     return
   }
 
@@ -48,8 +48,12 @@ function check_password() {
 function validate_username() {
   if (usernameRegex.test(username.value)) {
     username_error.value = ''
+  } else if (username.value.length < 8) {
+    username_error.value = 'Username must be ≥ 8 characters'
+  } else if (username.value.length > 20) {
+    username_error.value = 'Username must be ≤ 20 characters'
   } else {
-    username_error.value = 'Username must be 8-20 characters and can only contain letters, numbers, and certain symbols.'
+    username_error.value = 'Username contains invalid symbols'
   }
 }
 
@@ -303,7 +307,10 @@ const client = google.accounts.oauth2.initTokenClient({
     >
       <form class="space-y-6" @submit.prevent="signup">
         <div>
-          <label for="display" class="form-label">Display name</label>
+          <div class="flex items-center justify-between">
+            <label for="display" class="form-label">Display name</label>
+            <p id="regex-error" class="text-red-400 text-sm">{{ username_error }}</p>
+          </div>
 
           <div class="mt-2">
             <input
@@ -317,7 +324,6 @@ const client = google.accounts.oauth2.initTokenClient({
               class="form-input"
               />
             </div>
-            <p id="regex-error" class="text-red-400">{{ username_error }}</p>
         </div>
 
         <div>

@@ -1,8 +1,11 @@
 <script setup lang="ts" type="module">
 import { onMounted } from 'vue';
 // @ts-expect-error
-import { TsPdfViewer, TsPdfViewerOptions } from "ts-pdf";
+import { TsPdfViewer, TsPdfViewerOptions, type AnnotationDto } from "ts-pdf";
 import { throttle } from "throttle-debounce";
+
+// @ts-expect-error
+import { type Peer } from "https://esm.sh/peerjs@1.5.4?bundle-deps"
 
 const props = defineProps({
   file: {
@@ -13,8 +16,12 @@ const props = defineProps({
 
 const emits = defineEmits(["sendAnnotations", "requestAnnotations"]);
 
-let viewer = null;
-let current_annotations = [];
+export interface Annotation {
+  uuid: string;
+}
+
+let viewer: TsPdfViewer;
+let current_annotations: Annotation[] = [];
 
 // disabled and sending prevent infinite loop of importing and sending annotations
 async function sendAnnotations() {
@@ -34,22 +41,22 @@ async function sendAnnotations() {
 }
 
 // sends annotations to a single connection (useful for when a new user joins)
-async function sendAnnotationsTo(connection) {
+async function sendAnnotationsTo(connection: Peer) {
   const annotations = await viewer.exportAnnotationsAsync();
   connection.send({annotations: annotations});
 }
 
-async function importAnnotations(annotations) {
+async function importAnnotations(annotations: Annotation[]) {
   // remove annotations that already exist in current_annotations
-  annotations = annotations.filter((annotation) => {
+  const filtered_annotations = annotations.filter((annotation) => {
     for (const current_annotation of current_annotations.values())
       if (current_annotation.uuid === annotation.uuid) return false;
     return true;
-  });
+  }) as AnnotationDto[];
 
-  if (annotations.length > 0) {
-    current_annotations = current_annotations.concat(annotations);
-    await viewer.importAnnotationsAsync(annotations);
+  if (filtered_annotations.length > 0) {
+    current_annotations = current_annotations.concat(filtered_annotations);
+    await viewer.importAnnotationsAsync(filtered_annotations);
   }
 }
 

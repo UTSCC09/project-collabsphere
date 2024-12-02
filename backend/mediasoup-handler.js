@@ -4,6 +4,15 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+
+/* Debugging Console Log */
+const DEBUG = process.env.DEBUG || false;
+const log = (...args) => {
+	if (DEBUG) {
+		console.log(...args);
+	}
+};
+
 // Load config/mediasoup-config.json
 import config from "./config/mediasoup-config.json" assert { type: "json" };
 
@@ -51,7 +60,7 @@ const createWorker = async () => {
 /* Create a new Router for the room if it doesn't exist. */
 const get_router = async (sessionId) => {
 	if (!ms_router[sessionId]) {
-		console.log(`(join_stream_room) Creating new router for room ${sessionId}`);
+		log(`(join_stream_room) Creating new router for room ${sessionId}`);
 		ms_router[sessionId] = await ms_worker.createRouter({ mediaCodecs: ms_routerOptions.mediaCodecs });
 	}
 	return ms_router[sessionId];
@@ -61,12 +70,12 @@ const get_router = async (sessionId) => {
 const remove_router = async (sessionId) => {
 	try {
 		if (!ms_router[sessionId]) {
-			return console.log(`(remove_router) Router for room ${sessionId} does not exist`);
+			return log(`(remove_router) Router for room ${sessionId} does not exist`);
 		}
 
 		await ms_router[sessionId].close();
 		delete ms_router[sessionId];
-		console.log(`(remove_router) Router for room ${sessionId} removed`);
+		log(`(remove_router) Router for room ${sessionId} removed`);
 	} catch (error) {
 		console.error("Error removing router:", error);
 	}
@@ -165,11 +174,11 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		});
 
 		transport.on("close", () => {
-			console.log("Transport closed");
+			log("Transport closed");
 		});
 
 		transport.on("connectionstatechange", (state) => {
-			console.log("Transport state:", state); // Should eventually be "connected"
+			log("Transport state:", state); // Should eventually be "connected"
 		});
 
 		// Add transport to client
@@ -178,7 +187,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		client["transports"].push(transport.id);
 		rooms.set(sessionId, room);
 
-		console.log(`(createWebRtcTransport) Transport(id=${transport.id}) created for client`, id);
+		log(`(createWebRtcTransport) Transport(id=${transport.id}) created for client`, id);
 		return transport;
 	};
 
@@ -215,7 +224,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		with the existing producer IDs.
 	*/
 	socket.on("join_stream_room", async (callback) => {
-		console.log(`(join_stream_room) Client ${id} joined room ${sessionId}`);
+		log(`(join_stream_room) Client ${id} joined room ${sessionId}`);
 
 		// Create a Router for the room if it doesn't exist
 		const router = await get_router(sessionId);
@@ -256,7 +265,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			return;
 		}
 
-		console.log(`${label}(tr=${transportId})\n\t -> Transport connected to room ${sessionId}`);
+		log(`${label}(tr=${transportId})\n\t -> Transport connected to room ${sessionId}`);
 		const transport = transports.get(transportId);
 		if (!transport) {
 			console.error("Transport not found");
@@ -270,7 +279,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		as announces that a new producer has been created for clients to handle
 	*/
 	socket.on("produce", async ({ transportId, kind, rtpParameters, appData }, callback) => {
-		console.log(`(produce) called by ${label}(tr=${transportId})`);
+		log(`(produce) called by ${label}(tr=${transportId})`);
 		const room = get_room(sessionId);
 		const transport = transports.get(transportId);
 
@@ -350,7 +359,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			return;
 		}
 
-		console.log(`(consume) called by ${label}(tr=${transport.id})`);
+		log(`(consume) called by ${label}(tr=${transport.id})`);
 		const router = await get_router(sessionId);
 
 		if (!router) {
@@ -360,7 +369,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		}
 
 		if (!router.canConsume({ producerId, rtpCapabilities })) {
-			console.log("Cannot Consume");
+			log("Cannot Consume");
 			return callback({ error: "Cannot consume" });
 		}
 
@@ -390,7 +399,6 @@ const bind_mediasoup = (socket, sessionId, id) => {
 			dtlsParameters: transport.dtlsParameters,
 		};
 
-		// console.log("Consumer Callback Information:", callback_data);
 		callback({ params });
 	});
 
@@ -430,7 +438,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		const room = get_room(sessionId);
 		const producer = room.producers.find((p) => p.id === producerId);
 
-		console.log(`(pause-producer) called by ${label}(pr=${producerId})`);
+		log(`(pause-producer) called by ${label}(pr=${producerId})`);
 
 		if (!producer) {
 			console.error("Producer not found");
@@ -454,8 +462,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 	socket.on("resume-producer", async ({ clientId, producerId, kind }, callback) => {
 		const room = get_room(sessionId);
 		const producer = room.producers.find((p) => p.id === producerId);
-
-		console.log(`(resume-producer) called by ${label}(pr=${producerId})`);
+		log(`(resume-producer) called by ${label}(pr=${producerId})`);
 
 		if (!producer) {
 			console.error("Producer not found");
@@ -481,20 +488,20 @@ const bind_mediasoup = (socket, sessionId, id) => {
 const client_disconnect = (sessionId, id) => {
 	const room = get_room(sessionId);
 	if (!room) {
-		console.log("Room not found");
+		log("Room not found");
 		return;
 	}
 
 	const client = room.clients.get(id);
 	if (!client) {
-		console.log("Client not found");
+		log("Client not found");
 		return;
 	}
 
 	const socket = client.socket;
 
 	if (!socket) {
-		console.log("Socket not found");
+		log("Socket not found");
 		return;
 	}
 

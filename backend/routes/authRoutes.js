@@ -5,8 +5,10 @@ import {
   signout,
   requestPasswordReset,
   resetPassword,
-  oAuthSignin, oAuthSignup
+  oAuthSignin, oAuthSignup,
+  checkAuth,
 } from '../controllers/authController.js';
+import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -17,5 +19,6 @@ router.post('/oauth-signin', oAuthSignin);
 router.get('/signout', signout);
 router.get('/reset-password', requestPasswordReset);
 router.patch('/reset-password', resetPassword);
+router.get("/check-auth", verifyToken, checkAuth);
 
 export default router;

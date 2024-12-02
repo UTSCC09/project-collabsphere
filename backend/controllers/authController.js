@@ -253,3 +253,21 @@ export const resetPassword = async (req, res) => {
   }
 };
 
+// Check if user is authenticated
+export const checkAuth = async (req, res) => {
+	try {
+		const user = await User.findById(req.userId);
+		if (!user) {
+			return res.status(404).json({ message: "User not found" });
+		}
+
+		res.json({
+			message: "User remains authenticated",
+			username: user.username,
+			email: user.email,
+		});
+	} catch (error) {
+		console.error("Check Auth Error:", error);
+		res.status(500).json({ message: "Failed to retrieve user", error });
+	}
+};

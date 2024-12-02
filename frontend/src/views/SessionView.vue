@@ -1,10 +1,12 @@
 <script setup lang="ts" type="module">
 import {computed, onMounted, ref, type Ref, type Component, onBeforeUnmount, onBeforeMount} from "vue";
+
+// @ts-expect-error
 import { Peer } from "https://esm.sh/peerjs@1.5.4?bundle-deps"
 import { throttle } from 'throttle-debounce';
 import { io, Socket } from "socket.io-client";
 import CursorItem from "@/components/CursorItem.vue";
-import DocumentReader from "@/components/DocumentReader.vue";
+import DocumentReader, { type Annotation } from "@/components/DocumentReader.vue";
 import { useUserdataStore } from "@/stores/userdata";
 import SharedNote from "@/components/SharedNote.vue";
 import ClientAVFrame from '../components/ClientAVFrame.vue'
@@ -14,7 +16,7 @@ import { useNotificationStore } from "@/stores/notification";
 import router from "@/router";
 
 const isHost = ref(false);
-const hostId = ref(null);
+const hostId: Ref<string> = ref("");
 
 const userstore = useUserdataStore()
 
@@ -53,12 +55,13 @@ const cursors: Ref<Cursor[]> = ref([]);
 const cursorIds: string[] = [];
 // null while no file has been uploaded
 const file: Ref<Blob | null> = ref(null);
-const documentReaderRef: Ref<Component | null> = ref(null);
-const sharedNotesRef: Ref<Component | null> = ref(null);
+const documentReaderRef: Ref<typeof DocumentReader | null> = ref(null);
+const sharedNotesRef: Ref<typeof SharedNote | null> = ref(null);
 
 const notificationstore = useNotificationStore()
 
-interface data {
+interface Data {
+  request?: string,
   x?: number,
   y?: number,
   username?: string,
@@ -66,7 +69,7 @@ interface data {
   annotations?: any,
 }
 
-let socket: Socket | null = null;
+let socket: Socket;
 
 // retrieves connection id of the current host
 async function getHostId() {
@@ -97,6 +100,12 @@ onBeforeMount(async () => {
     transports: ['websocket', 'polling', 'flashsocket'],
     withCredentials: true,
   });
+
+  // This should never happen, but just in case
+  if (socket === null) {
+    console.error("Socket.IO connection not established.");
+    return;
+  }
 
   socket.on('connect', () => {
     console.log('Socket.IO connected with ID:', socket.id);
@@ -139,8 +148,14 @@ onBeforeMount(async () => {
         }
         fileReader.readAsArrayBuffer(file.value);
       }
-      // send notes
-      sharedNotesRef.value.transmit();
+
+      if (sharedNotesRef.value) {
+        // send notes
+        sharedNotesRef.value.transmit();
+      } else {
+        console.error("Shared notes component not available");
+      }
+
     });
   });
 
@@ -176,7 +191,7 @@ function connection_init(conn: Peer) {
   const x_coord = ref(0);
   const y_coord = ref(0);
 
-  conn.on("data", async (data: data) => {
+  conn.on("data", async (data: Data) => {
     // reject if conn.peer is not in otherUsers
     if (!otherUsers.has(conn.peer)) return;
 
@@ -211,14 +226,19 @@ function connection_init(conn: Peer) {
       return;
     }
 
-    if (data.annotations) {
-      documentReaderRef.value.importAnnotations(data.annotations);
-      return;
-    }
+    // Document reader related data below this line
+    if (documentReaderRef.value) {
 
-    if (data.request) {
-      if (data.request === "annotations")
-        documentReaderRef.value.sendAnnotationsTo(conn);
+      if (data.annotations) {
+        documentReaderRef.value.importAnnotations(data.annotations);
+        return;
+      }
+
+      if (data.request) {
+        if (data.request === "annotations") {
+            documentReaderRef.value.sendAnnotationsTo(conn);
+        }
+      }
     }
   });
 
@@ -229,8 +249,16 @@ function connection_init(conn: Peer) {
 
 function peer_init() {
   peer.on("open", (id: string) => {
+    if (!socket) {
+      console.error("Socket.IO connection not established.");
+      return;
+    }
     console.log("Joining session.", sessionID.value, id, username.value);
     socket.emit("join_session", sessionID.value, id, async () => {
+      if (!socket) {
+        console.error("Socket.IO connection not established.");
+        return;
+      }
       setupMedia(socket, username.value);
     });
   });
@@ -267,7 +295,7 @@ onMounted(() => {
   onmousemove = e => throttledSendCursor(e, conns);
 });
 
-function sendAnnotations(annotations) {
+function sendAnnotations(annotations: Annotation[]) {
   for (const conn of conns) {
     conn.send({annotations: annotations});
   }
@@ -296,7 +324,8 @@ function handleFileInput(e: Event) {
     for (const conn of conns)
       conn.send({file: fileReader.result});
   }
-  fileReader.readAsArrayBuffer(file.value);
+
+  if (file.value) fileReader.readAsArrayBuffer(file.value);
 }
 
 const isFile = computed(() => {
@@ -306,7 +335,7 @@ const isFile = computed(() => {
 onBeforeUnmount(() => {
   if (socket) {
     socket.disconnect();
-    onDisconnect(socket);
+    onDisconnect();
   }
 });
 </script>

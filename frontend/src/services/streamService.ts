@@ -48,6 +48,14 @@ import * as mediasoup from 'mediasoup-client'
 import { ref, toRaw, type Ref } from 'vue'
 import { Socket } from 'socket.io-client'
 import type { ClientStreamData } from '@/components/ClientAVFrame.vue'
+import type {
+  Consume,
+  GetRTPCapabilities,
+  JoinStreamRoom,
+  Produce,
+  ProducerID,
+} from './streamServiceTypes'
+import type { TransportOptions } from 'mediasoup-client/lib/types'
 
 let myStreamID: string
 let myVideoProducerID: string
@@ -69,8 +77,8 @@ const clientConfigData: Ref<Map<string, ClientStreamData>> = ref(new Map())
 const createRecvTransport = async (device: mediasoup.types.Device) => {
   if (consumerTransport.value != null) return toRaw(consumerTransport.value)
 
-  const params = await new Promise(resolve =>
-    socket?.emit('create_transport', params => {
+  const params: TransportOptions = await new Promise(resolve =>
+    socket?.emit('create_transport', (params: TransportOptions) => {
       resolve(params)
     }),
   )
@@ -97,11 +105,12 @@ const createRecvTransport = async (device: mediasoup.types.Device) => {
 const createSendTransport = async (device: mediasoup.types.Device) => {
   if (producerTransport.value != null) return toRaw(producerTransport.value)
 
-  const params = await new Promise(resolve =>
-    socket?.emit('create_transport', params => {
+  const params: TransportOptions = await new Promise(resolve =>
+    socket?.emit('create_transport', (params: TransportOptions) => {
       resolve(params)
     }),
   )
+
   // Initialize a producer webRTC transport
   const newSendTransport = device.createSendTransport(params)
 
@@ -128,10 +137,10 @@ const createSendTransport = async (device: mediasoup.types.Device) => {
         rtpParameters,
         appData,
       },
-      response => {
+      (response: Produce) => {
         if (response.error) {
           console.error('Error producing', response.error)
-          callback({ error: response.error })
+          callback({ id: '' })
           return
         }
         const { id } = response
@@ -165,7 +174,7 @@ const getDevice = async (
 
     device.value = newDevice
     return newDevice
-  } catch (e) {
+  } catch (e: any) {
     log(e)
     if (e.name == 'UnsupportedError') {
       console.warn('Unsupported Browser.')
@@ -177,7 +186,7 @@ const getDevice = async (
 }
 
 /* Bind a consumer to a producer and then prepare it for display */
-function bindConsumer(producerData) {
+function bindConsumer(producerData: ProducerID) {
   const { producerId, kind, appData } = producerData
   let client_username = 'unknown'
   let paused = true
@@ -192,6 +201,12 @@ function bindConsumer(producerData) {
 
   return new Promise(async (resolve, reject) => {
     const device = await getDevice()
+
+    if (!device) {
+      console.error('No device found')
+      return reject(Error('No device found'))
+    }
+
     const consumerTransport = await createRecvTransport(device)
 
     socket?.emit(
@@ -201,7 +216,7 @@ function bindConsumer(producerData) {
         producerId,
         rtpCapabilities: device.rtpCapabilities,
       },
-      async ({ params, error }) => {
+      async ({ params, error }: { params: Consume['params']; error: any }) => {
         if (error) {
           log('Error consuming', error)
           return reject(Error(`Cannot consume`))
@@ -240,26 +255,77 @@ function bindConsumer(producerData) {
 }
 
 /* Bind consumers for all existing producers */
-async function bindExistingConsumers(producerIds) {
+async function bindExistingConsumers(producerIds: ProducerID[]) {
   log("ProducerID's to consume:", producerIds)
   // Bind consumers for all existing producers
-  for (const producerId of producerIds) {
-    if (producerId == myVideoProducerID) {
+  for (const producerData of producerIds) {
+    if (producerData.id == myVideoProducerID) {
       continue
     }
 
     try {
-      await bindConsumer(producerId)
+      await bindConsumer(producerData)
     } catch (e) {
       console.error('Error binding consumer', e)
     }
   }
 }
 
+async function sendMyVideoTracks(
+  stream: MediaStream,
+  producerTransport: mediasoup.types.Transport,
+) {
+  if (!stream || (stream && stream.getVideoTracks().length == 0)) {
+    console.error('No video track found')
+    return
+  }
+
+  const videoTrack = stream?.getVideoTracks()[0]
+
+  const video_payload = {
+    ...media_configs,
+    track: videoTrack,
+    kind: 'video',
+    appData: { username },
+  }
+
+  const prod_trans = await producerTransport.produce(video_payload)
+  if (prod_trans.paused) {
+    prod_trans.resume()
+  }
+
+  log('Track ID:', prod_trans.id)
+  return prod_trans.id
+}
+
+async function sendMyAudioTracks(
+  stream: MediaStream,
+  producerTransport: mediasoup.types.Transport,
+) {
+  // Check has audio
+  if (!stream || (stream && stream.getAudioTracks().length == 0)) {
+    console.error('No audio track found')
+    return
+  }
+
+  const audioTrack = stream?.getAudioTracks()[0]
+  const audio_payload = {
+    track: audioTrack,
+    kind: 'audio',
+    appData: { username },
+  }
+
+  const audio_prod_trans = await producerTransport.produce(audio_payload)
+  if (audio_prod_trans.paused) {
+    audio_prod_trans.resume()
+  }
+  return audio_prod_trans.id
+}
+
 /*  Feed video and audio into producer transport.
     Begin listening for new producers as well as existing producers */
 async function initializeStreams(
-  data,
+  data: JoinStreamRoom,
   hasMedia = true,
 ): Promise<
   | {
@@ -286,53 +352,29 @@ async function initializeStreams(
 
     const stream = await retrieveLocalStream()
 
-    if (stream && stream.getVideoTracks().length > 0) {
-      const videoTrack = stream?.getVideoTracks()[0]
-
-      const video_payload = {
-        ...media_configs,
-        track: videoTrack,
-        kind: 'video',
-        appData: { username },
-      }
-
-      const prod_trans = await producerTransport.produce(video_payload)
-      myVideoProducerID = prod_trans.id
-      if (prod_trans.paused) {
-        await prod_trans.resume()
-      }
-
-      log('Track ID:', prod_trans.id)
-    }
-
-    // Check has audio
-    if (stream && stream.getAudioTracks().length > 0) {
-      log('Audio track found')
-      const audioTrack = stream?.getAudioTracks()[0]
-      const audio_payload = {
-        track: audioTrack,
-        kind: 'audio',
-        appData: { username },
-      }
-
-      const audio_prod_trans = await producerTransport.produce(audio_payload)
-      myAudioProducerID = audio_prod_trans.id
-      if (audio_prod_trans.paused) {
-        await audio_prod_trans.resume()
-      }
+    if (stream) {
+      myVideoProducerID =
+        (await sendMyVideoTracks(stream, producerTransport)) ?? ''
+      myAudioProducerID =
+        (await sendMyAudioTracks(stream, producerTransport)) ?? ''
+    } else {
+      console.error('No stream found')
     }
   }
 
   // Create producer transport
-  socket?.on('new_producer', async producerData => {
+  socket.on('new_producer', async producerData => {
     log('New producer', producerData)
     await bindConsumer(producerData)
   })
 
   // Get producer ids
-  socket?.emit('get_producer_ids', ({ producerIds }) => {
-    bindExistingConsumers(producerIds)
-  })
+  socket.emit(
+    'get_producer_ids',
+    ({ producerIds }: { producerIds: ProducerID[] }) => {
+      bindExistingConsumers(producerIds)
+    },
+  )
 
   return { myVideoProducerID, myAudioProducerID }
 }
@@ -365,18 +407,9 @@ async function retrieveLocalStream() {
 /* Returns true if has media */
 async function checkHasMedia() {
   try {
-    const devices = await navigator.mediaDevices.enumerateDevices()
-    let audioSource: string | null = null
-    let videoSource: string | null = null
-    devices.forEach(device => {
-      if (device.kind === 'audioinput') {
-        audioSource = device.deviceId
-      } else if (device.kind === 'videoinput') {
-        videoSource = device.deviceId
-      }
-    })
+    await navigator.mediaDevices.enumerateDevices()
     return true
-  } catch (err) {
+  } catch (err: any) {
     if (err.name === 'NotFoundError') {
       log('No media devices found.')
     } else {
@@ -439,13 +472,14 @@ async function setupMedia(_socket: Socket, _username: string) {
   }
 
   // Initialize streams
-  _socket.emit('join_stream_room', async params => {
+  _socket.emit('join_stream_room', async (params: JoinStreamRoom) => {
     // Fetch RTP Capabilities
-    const { rtpCapabilities } = await new Promise(resolve => {
-      _socket.emit('get_rtp_capabilities', data => {
+    const response = await new Promise(resolve => {
+      _socket.emit('get_rtp_capabilities', (data: GetRTPCapabilities) => {
         resolve(data)
       })
     })
+    const { rtpCapabilities } = response as { rtpCapabilities: any }
 
     if (!rtpCapabilities) {
       return console.error('No router RTP capabilities found')
@@ -456,7 +490,11 @@ async function setupMedia(_socket: Socket, _username: string) {
     if (!device) return console.error('No device found')
 
     // Close tracks for now
-    async function joinCall(params) {
+    async function joinCall(params: JoinStreamRoom) {
+      if (!device) {
+        return console.error('No device found')
+      }
+
       let local_stream = await retrieveLocalStream()
       if (!local_stream) {
         return console.error('No stream found')
@@ -467,14 +505,14 @@ async function setupMedia(_socket: Socket, _username: string) {
       await createSendTransport(device)
       await createRecvTransport(device)
 
-      const { myVideoProducerID, myAudioProducerID } = await initializeStreams(
-        params,
-        hasMedia,
-      )
+      const results = await initializeStreams(params, hasMedia)
 
-      if (!myVideoProducerID) {
-        return console.error('No producer ID found')
+      if (!results) {
+        return console.error('No results found')
       }
+
+      const { myVideoProducerID, myAudioProducerID } = results
+
 
       // Change producer ID to actual ID
       if (!clientConfigData.value) return
@@ -485,8 +523,8 @@ async function setupMedia(_socket: Socket, _username: string) {
         return
       }
 
-      myConfigs.producerId = myVideoProducerID
-      myConfigs.audioProducerId = myAudioProducerID
+      myConfigs.producerId = myVideoProducerID || ''
+      myConfigs.audioProducerId = myAudioProducerID || ''
       myConfigs.videoDisabled = true
       myConfigs.audioDisabled = true
       if (local_stream) myConfigs.stream = local_stream
@@ -517,7 +555,6 @@ async function setupMedia(_socket: Socket, _username: string) {
     log('Removing client', id)
     removeClientStream(id)
   })
-
 }
 
 /* Toggle mute: Used locally */
@@ -612,7 +649,7 @@ function onDisconnect() {
 
   producers = {}
 
-  for (const [key, data] of clientConfigData.value.entries()) {
+  for (const [key, _] of clientConfigData.value.entries()) {
     removeClientStream(key)
   }
 
