@@ -15,6 +15,7 @@ import jwt from 'jsonwebtoken';
 dotenv.config();
 
 const app = express();
+const httpApp = express();
 
 app.use(cors({
   origin: process.env.FRONTEND,
@@ -47,6 +48,16 @@ const server = createServer(config, app);
 
 // * Peer server
 const httpsSocketServer = createServer(config, app);
+
+// * Redirect server
+// modified from https://stackoverflow.com/questions/75253828/redirect-http-to-https-using-express
+httpApp.use((req, res) => {
+  res.redirect("https://collabsphere.xyz/" + req.path);
+});
+
+httpApp.listen(80, () => {
+  console.log("Redirect server listening on port 80.");
+});
 
 const io = new Server(httpsSocketServer, {
 	cors: {
@@ -168,7 +179,6 @@ io.on("connection", (socket) => {
     callback();
   });
 });
-
 
 // server.listen(3030);
 // export the app for testing
