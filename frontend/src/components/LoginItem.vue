@@ -23,7 +23,7 @@ const processing = ref(false)
 
 function validate_password() {
   if (password.value.length < 8) {
-    regex_error.value = 'Password must be > 8 characters'
+    regex_error.value = 'Password must be ≥ 8 characters'
     return
   }
 
@@ -48,11 +48,11 @@ function validate_username() {
   if (usernameRegex.test(username.value)) {
     username_error.value = ''
   } else if (username.value.length < 8) {
-    username_error.value = 'Username must have at least 8 characters.'
+    username_error.value = 'Username must be ≥ 8 characters.'
   } else if (username.value.length > 20) {
-    username_error.value = 'Username must have at most 20 characters.'
+    username_error.value = 'Username must be ≤ 20 characters.'
   } else {
-    username_error.value = 'Characters can be alphanumeric or _@./#&+!-.'
+    username_error.value = 'Username contains invalid symbols.'
   }
 }
 
@@ -207,7 +207,7 @@ const isDisabled = computed(() => {
         <div>
           <div class="flex items-center justify-between">
             <label for="display" class="form-label">Display name</label>
-            <p id="regex-error" class="text-red-400 text-xs">{{ username_error }}</p>
+            <p id="regex-error" class="text-red-400 text-sm">{{ username_error }}</p>
           </div>
 
           <div class="mt-2">
