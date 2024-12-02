@@ -1,7 +1,7 @@
 <script  setup lang="ts" type="module">
 import { useNotificationStore } from '@/stores/notification';
 import { useUserdataStore } from '@/stores/userdata';
-import { computed, watch } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const router = useRouter()
@@ -38,6 +38,28 @@ watch(isLoggedIn, (value) => {
         router.push('/');
     }
 });
+
+onMounted(async () => {
+    // Query /api/is-authenticated to check if user is logged in
+
+    const response = await userstore.checkAuth();
+    // Check if response is of type Error and that the message is "TypeError: Failed to fetch"
+    if (response instanceof Error) {
+        let message = response.message.toString();
+        switch (message) {
+            case "TypeError: Failed to fetch":
+                message = "Failed to connect to server";
+                break;
+            case "Invalid token":
+                message = "Not authenticated. Please log in again";
+                break;
+            default:
+                router.push('/');
+        }
+
+        notificationstore.addNotification({message});
+    }
+})
 
 </script>
 
