@@ -136,7 +136,21 @@ async function signup() {
 
 const isDisabled = computed(() => {
   return !(reg.test(password.value) && password.value === cpassword.value)
-})
+});
+
+const client = google.accounts.oauth2.initTokenClient({
+  client_id: 'YOUR_GOOGLE_CLIENT_ID',
+  scope: 'https://www.googleapis.com/auth/userinfo.email',
+  callback: (response) => {
+    // retrieve email from response
+    // switch status to 'OAuth username'
+    // send fetch request to see if email already exists in database
+    // if it does sign in? or maybe check if account is an OAuth account
+    // else set status to 'OAuth username' with one username field
+      // on submit, fetch and check if username is already in use
+      // if not, add user to database and sign in
+  },
+});
 </script>
 
 <template>
@@ -190,7 +204,7 @@ const isDisabled = computed(() => {
         <input v-else type="submit" class="btn" value="Sign in" />
       </form>
       <p class="text-center mt-2 mb-2">or</p>
-      <img src="./icons/web_light_rd_SI.svg" alt="Sign in with Google" class="justify-self-center hover:opacity-75"/>
+      <img src="./icons/web_light_rd_SI.svg" alt="Sign in with Google" class="justify-self-center hover:opacity-75" @click="client.requestAccessToken"/>
       <p class="mt-10 text-center text-sm text-gray-500">
         Not a member?
         <a href="#" class="a-href" @click="status = 'Sign up'">Sign up</a>
