@@ -1,12 +1,13 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
+import fetchWrapper from '@/utils/fetchWrapper'
 
 // Dummy fields until we have a real user store
 export const useUserdataStore = defineStore('userdata', () => {
   const isLoggedIn = ref(false)
   const username = ref('')
   const useremail = ref('')
-  
+
   const sessionID = ref('')
   const isHost = ref(false)
 
@@ -26,10 +27,10 @@ export const useUserdataStore = defineStore('userdata', () => {
       useremail.value = ''
       sessionID.value = ''
       isHost.value = false
-      
+
       clearLocalStorage()
     } catch (error) {
-      console.error("Sign-out failed:", error)
+      console.error('Sign-out failed:', error)
     }
   }
 
@@ -47,21 +48,18 @@ export const useUserdataStore = defineStore('userdata', () => {
     isHost.value = true
     sessionID.value = sessionId
     saveToLocalStorage()
-    
   }
 
   const joinSession = (sessionId: string) => {
     isHost.value = false
     sessionID.value = sessionId
     saveToLocalStorage()
-
   }
 
   const leaveSession = () => {
     isHost.value = false
     sessionID.value = ''
     saveToLocalStorage()
-
   }
 
   const saveToLocalStorage = () => {
@@ -88,10 +86,31 @@ export const useUserdataStore = defineStore('userdata', () => {
         isLoggedIn.value = true
       }
     }
-  } 
+  }
 
   const clearLocalStorage = () => {
     localStorage.removeItem('userdata')
+  }
+
+  const checkAuth = async () => {
+    try {
+      const data = await fetchWrapper(
+        `${import.meta.env.VITE_PUBLIC_BACKEND}/api/check-auth`,
+        {
+          method: 'GET',
+          credentials: 'include',
+        },
+      )
+
+      username.value = data.username
+      useremail.value = data.email
+      isLoggedIn.value = true
+      saveToLocalStorage()
+      return true
+    } catch (error) {
+      console.log(error)
+      return error
+    }
   }
 
   loadFromLocalStorage()
@@ -107,6 +126,7 @@ export const useUserdataStore = defineStore('userdata', () => {
     hostSession,
     joinSession,
     leaveSession,
+    checkAuth,
     sessionID,
     isHost,
   }
