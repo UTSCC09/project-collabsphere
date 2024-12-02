@@ -27,10 +27,10 @@ export const signup = async (req, res) => {
       const hash = await bcrypt.hash(password, salt);
   
       const user = new User({
-        username,
-        email,
-        hash,
-        salt,
+        username: username,
+        email: email,
+        hash: hash,
+        salt: salt,
       });
   
       await user.save();
@@ -53,6 +53,66 @@ export const signup = async (req, res) => {
       console.error('Signup Error:', error);
       res.status(500).json({ message: 'User registration failed', error });
     }
+};
+
+// OAuth signup
+export const oAuthSignup = async (req, res) => {
+  const { username, email, OAuthToken } = req.body;
+
+  // validate username
+  if (!usernameRegex.test(username)) {
+    return res.status(400).json({ message: 'Invalid username format. It must be 8-20 characters and can only contain letters, numbers, and certain symbols.' });
+  }
+
+  try {
+    // check OAuthToken for validity
+    const ticket = await client.verifyIdToken({
+      idToken: OAuthToken,
+      audience: CLIENT_ID,  // Specify the CLIENT_ID of the app that accesses the backend
+    }).catch((error) => {
+      throw new Error(error);
+    });
+
+    const payload = ticket.getPayload();
+    const userid = payload['sub'];
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+
+    // since there is no password, salt and hash are empty strings
+    const salt = ''
+    const hash = ''
+
+    const user = new User({
+      username: username,
+      email: email,
+      userid: userid,
+      hash: hash,
+      salt: salt,
+    });
+
+    await user.save();
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none"
+    });
+
+    res.status(201).json({
+      message: "User registered successfully",
+      username: user.username,
+      email: user.email,
+    });
+
+  } catch (error) {
+    console.error('Signup Error:', error);
+    res.status(500).json({ message: 'User registration failed', error });
+  }
 };
 
 // user signin

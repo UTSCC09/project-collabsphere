@@ -20,6 +20,7 @@ const username = ref('')
 const email = ref('')
 const password = ref('')
 const cpassword = ref('')
+let token = null;
 
 const processing = ref(false)
 
@@ -147,6 +148,7 @@ async function oauth_signup() {
         body: JSON.stringify({
           username: username.value,
           email: email.value,
+          OAuthToken: token,
         }),
       },
     )
@@ -186,8 +188,10 @@ const client = google.accounts.oauth2.initTokenClient({
   scope: 'https://www.googleapis.com/auth/userinfo.email',
   callback: (response) => {
     if (google.accounts.oauth2.hasGrantedAnyScope(response, 'https://www.googleapis.com/auth/userinfo.email')) {
+      token = response;
       email.value = response.userinfo.email;
 
+      // try to sign in with the token
       response_error.value = ''
       processing.value = true
       try {
@@ -206,8 +210,10 @@ const client = google.accounts.oauth2.initTokenClient({
           },
         );
 
+        // if the account does not exist, let user sign up with token
         if (res.status === 404) {
           status.value = 'Choose your display name';
+          return;
         }
 
         if (!res.ok) {
