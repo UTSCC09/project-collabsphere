@@ -48,11 +48,11 @@ function validate_username() {
   if (usernameRegex.test(username.value)) {
     username_error.value = ''
   } else if (username.value.length < 8) {
-    username_error.value = 'Username must be ≥ 8 characters.'
+    username_error.value = 'Username must be ≥ 8 characters'
   } else if (username.value.length > 20) {
-    username_error.value = 'Username must be ≤ 20 characters.'
+    username_error.value = 'Username must be ≤ 20 characters'
   } else {
-    username_error.value = 'Username contains invalid symbols.'
+    username_error.value = 'Username contains invalid symbols'
   }
 }
 
