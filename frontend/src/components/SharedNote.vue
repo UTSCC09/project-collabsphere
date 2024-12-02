@@ -1,18 +1,27 @@
 <script setup type="module" lang="ts">
-import { onMounted, ref, Ref } from "vue";
+import { onMounted, ref, type Ref } from "vue";
+import { Socket } from "socket.io-client";
 
 const props = defineProps({
-  socket: Object,
+  socket: Socket,
 });
 
 const note: Ref<string | null> = ref(null);
 onMounted(() => {
+  if (!props.socket) {
+    console.error('Socket not available');
+    return;
+  }
   props.socket.on('note', (data: string) => {
     note.value = data;
   });
 });
 
 function transmit() {
+  if (!props.socket) {
+    console.error('Socket not available');
+    return;
+  }
   props.socket.emit('note', note.value);
 }
 
