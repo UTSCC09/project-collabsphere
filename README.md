@@ -8,12 +8,13 @@ __None of your non-account data is stored on the backend__, with all data being 
 
 ## Getting started
 ### Frontend
-First, you need to initialize the environment variables. Create a .env file in the frontend folder. To run the application non-locally, change VITE_PUBLIC_BACKEND and VITE_PUBLIC_SOCKET. VITE_SSL_PRIVATE_KEY_PATH and VITE_SSL_CERTIFICATE_PATH are only needed for HTTPS.
+First, you need to initialize the environment variables. Create a .env file in the frontend folder. To run the application non-locally, change VITE_PUBLIC_BACKEND and VITE_PUBLIC_SOCKET. VITE_SSL_PRIVATE_KEY_PATH and VITE_SSL_CERTIFICATE_PATH are only needed for HTTPS. VITE_GOOGLE_CLIENT_ID is only needed for Google OAuth 2.0 login.
 ```
 VITE_PUBLIC_BACKEND=https://localhost:4000
 VITE_PUBLIC_SOCKET=https://localhost:3030
 VITE_SSL_PRIVATE_KEY_PATH=pathToPrivateKey.pem
 VITE_SSL_CERTIFICATE_PATH=pathToCertificate.pem
+VITE_GOOGLE_CLIENT_ID=00000000000-00000000000000000000000000000000.apps.googleusercontent.com
 ```
 To run the frontend locally:
 ```
@@ -24,11 +25,12 @@ npm run dev
 
 ### Backend
 
-First, you need to initialize the environment variables. Create a .env file in the backend folder. To run the application non-locally, change FRONTEND.
+First, you need to initialize the environment variables. Create a .env file in the backend folder. To run the application non-locally, change FRONTEND. GOOGLE_CLIENT_ID is only needed for Google OAuth 2.0 login.
 ```
 MONGODB_URI=yourMongoDBURI
 JWT_SECRET=yourJWTSecret
 FRONTEND=https://localhost:5173
+GOOGLE_CLIENT_ID=00000000000-00000000000000000000000000000000.apps.googleusercontent.com
 ```
 To run the backend locally:
 ```

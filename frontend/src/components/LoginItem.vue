@@ -2,11 +2,13 @@
 import { ref, computed } from 'vue'
 import { useUserdataStore } from '@/stores/userdata'
 import SpinnerIcon from './SpinnerIcon.vue';
+import fetchWrapper from "@/utils/fetchWrapper";
 
 const userstore = useUserdataStore()
 
 // password regex
 const reg = new RegExp('^[ A-Za-z0-9_@./#&+!-]{8,}$')
+const usernameRegex = /^[ A-Za-z0-9_@./#&+!-]{8,20}$/;
 
 const status = ref('Sign in')
 const match_error = ref('')
@@ -18,6 +20,7 @@ const username = ref('')
 const email = ref('')
 const password = ref('')
 const cpassword = ref('')
+let token = null;
 
 const processing = ref(false)
 
@@ -43,8 +46,6 @@ function check_password() {
 }
 
 function validate_username() {
-  const usernameRegex = /^[ A-Za-z0-9_@./#&+!-]{8,20}$/;
-
   if (usernameRegex.test(username.value)) {
     username_error.value = ''
   } else if (username.value.length < 8) {
@@ -94,7 +95,6 @@ async function signin() {
   }
 
   processing.value = false
-
 }
 
 async function signup() {
@@ -138,9 +138,110 @@ async function signup() {
   processing.value = false
 }
 
+async function oauth_signup() {
+  try {
+    response_error.value = ''
+    processing.value = true
+    const response = await fetch(
+      `${import.meta.env.VITE_PUBLIC_BACKEND}/api/oauth-signup`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: username.value,
+          email: email.value,
+          OAuthToken: token,
+        }),
+      },
+    )
+
+    if (!response.ok) {
+      try {
+        const json = await response.json()
+        response_error.value = json.message || 'Error signing up'
+      } finally {
+        throw new Error(`Response status: ${response.status}`)
+      }
+    }
+    const json = await response.json()
+
+    const { username: resUsername, email: resEmail } = json
+
+    userstore.setUsername(resUsername)
+    userstore.setEmail(resEmail)
+    userstore.login()
+  } catch (error) {
+    console.log(error)
+  }
+
+  processing.value = false
+}
+
 const isDisabled = computed(() => {
-  return !(reg.test(password.value) && password.value === cpassword.value)
-})
+  return !(reg.test(username.value) && reg.test(password.value) && password.value === cpassword.value);
+});
+
+const isAuthDisabled = computed(() => {
+  return !reg.test(username.value);
+});
+
+const client = google.accounts.oauth2.initTokenClient({
+  client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+  scope: 'https://www.googleapis.com/auth/userinfo.email',
+  callback: async (response) => {
+    if (google.accounts.oauth2.hasGrantedAnyScope(response, 'https://www.googleapis.com/auth/userinfo.email')) {
+      token = response;
+
+      // try to sign in with the token
+      response_error.value = ''
+      processing.value = true
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_PUBLIC_BACKEND}/api/oauth-signin`,
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              OAuthToken: response,
+            }),
+          },
+        );
+
+        // if the account does not exist, let user sign up with token
+        if (res.status === 404) {
+          status.value = 'Choose your display name';
+          return;
+        }
+
+        if (!res.ok) {
+          try {
+            const json = await res.json()
+            response_error.value = json.message || 'Error signing up'
+          } finally {
+            throw new Error(`Response status: ${res.status}`)
+          }
+        }
+
+        const json = await res.json();
+        const { username, email: resEmail } = json;
+
+        userstore.setUsername(username);
+        userstore.setEmail(resEmail);
+        userstore.login();
+        return;
+      } catch (error) {
+        console.log(error)
+      }
+
+      processing.value = false
+    }
+  },
+});
 </script>
 
 <template>
@@ -193,7 +294,8 @@ const isDisabled = computed(() => {
         <div v-if="processing" class="w-full flex items-center justify-center"><SpinnerIcon/></div>
         <input v-else type="submit" class="btn" value="Sign in" />
       </form>
-
+      <p class="text-center mt-2 mb-2">or</p>
+      <img src="./icons/web_light_rd_SI.svg" alt="Sign in with Google" class="ml-auto mr-auto hover:opacity-75" @click="client.requestAccessToken"/>
       <p class="mt-10 text-center text-sm text-gray-500">
         Not a member?
         <a href="#" class="a-href" @click="status = 'Sign up'">Sign up</a>
@@ -303,7 +405,33 @@ const isDisabled = computed(() => {
       <p>TODO: Implement at the end</p>
     </div>
     -->
+    <div
+      v-else-if="status === 'Choose your display name'"
+      class="mt-10 sm:mx-auto sm:w-full sm:max-w-sm"
+    >
+      <form class="space-y-6" @submit.prevent="oauth_signup">
+        <div>
+          <div class="mt-2 mb-2">
+            <input
+              name="username"
+              @keyup="validate_username"
+              v-model="username"
+              autocomplete="username"
+              placeholder="display name"
+              required
+              class="form-input"
+            />
+          </div>
+          <p id="regex-error" class="text-red-400">{{ username_error }}</p>
+          <input
+            type="submit"
+            class="btn"
+            :disabled="isAuthDisabled"
+            value="Complete registration"
+          />
+        </div>
+      </form>
+    </div>
   </div>
 </template>
-
 <style lang="postcss" scoped></style>
