@@ -508,9 +508,6 @@ async function setupMedia(_socket: Socket, _username: string) {
 
       const { myVideoProducerID, myAudioProducerID } = results
 
-      if (!myVideoProducerID) {
-        return console.error('No producer ID found')
-      }
 
       // Change producer ID to actual ID
       if (!clientConfigData.value) return
@@ -521,8 +518,8 @@ async function setupMedia(_socket: Socket, _username: string) {
         return
       }
 
-      myConfigs.producerId = myVideoProducerID
-      myConfigs.audioProducerId = myAudioProducerID
+      myConfigs.producerId = myVideoProducerID || ''
+      myConfigs.audioProducerId = myAudioProducerID || ''
       myConfigs.videoDisabled = true
       myConfigs.audioDisabled = true
       if (local_stream) myConfigs.stream = local_stream

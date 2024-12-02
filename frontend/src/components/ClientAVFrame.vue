@@ -2,37 +2,6 @@
 import { computed, onMounted, ref, watch, type Ref } from 'vue'
 import type { Socket } from 'socket.io-client'
 
-/*
-  const mediaStreamSource = audioContext.createMediaStreamSource(stream);
-  const analyser = audioContext.createAnalyser();
-  mediaStreamSource.connect(analyser);
-
-  const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-  function monitorParticipant() {
-    analyser.getByteTimeDomainData(dataArray);
-
-    let sum = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-      const value = (dataArray[i] - 128) / 128;
-      sum += value * value;
-    }
-    const volume = Math.sqrt(sum / dataArray.length);
-    const isSpeaking = volume > 0.05;
-
-    const streamBox = document.getElementById(`participant-${index}`); // Replace with actual IDs
-    if (isSpeaking) {
-      streamBox.classList.add('highlight');
-    } else {
-      streamBox.classList.remove('highlight');
-    }
-
-    requestAnimationFrame(monitorParticipant);
-  }
-
-  monitorParticipant();
-*/
-
 export interface ClientStreamData {
   id: string
   producerId: string
@@ -82,6 +51,7 @@ try {
 }
 
 const pause_resume_cb = (data : {error: string}) => {
+
     if (data && data.error) {
         console.error(data.error)
     }

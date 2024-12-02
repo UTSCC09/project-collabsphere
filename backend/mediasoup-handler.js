@@ -454,7 +454,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 	socket.on("resume-producer", async ({ clientId, producerId, kind }, callback) => {
 		const room = get_room(sessionId);
 		const producer = room.producers.find((p) => p.id === producerId);
-
+		console.log(clientId, producerId, kind);
 		console.log(`(resume-producer) called by ${label}(pr=${producerId})`);
 
 		if (!producer) {
