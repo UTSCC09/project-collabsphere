@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useUserdataStore } from '@/stores/userdata'
 import SpinnerIcon from './SpinnerIcon.vue';
+import fetchWrapper from "@/utils/fetchWrapper";
 
 const userstore = useUserdataStore()
 
@@ -146,12 +147,42 @@ const client = google.accounts.oauth2.initTokenClient({
   callback: (response) => {
     if (google.accounts.oauth2.hasGrantedAnyScope(response, 'https://www.googleapis.com/auth/userinfo.email')) {
       const email = response.userinfo.email;
-      status.value = 'Choose your display name';
-      // send fetch request to see if email already exists in database
-      // if it does, send sign in request with token to verify
-      // else set status to 'OAuth username' with one username field
-      // on submit, fetch and check if username is already in use
-      // if not, add user to database with token to verify and sign in
+
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_PUBLIC_BACKEND}/api/oauth-signin`,
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: email,
+              OAuthToken: response,
+            }),
+          },
+        );
+
+        // sign in
+        if (res.ok) {
+          const json = await res.json();
+          const { username, email: resEmail } = json;
+
+          userstore.setUsername(username);
+          userstore.setEmail(resEmail);
+          userstore.login();
+          return;
+        }
+
+        if (response.status === 404) {
+          status.value = 'Choose your display name';
+          // on submit, fetch and check if username is already in use
+          // if not, add user to database with token to verify and sign in
+        }
+      } catch (error) {
+        console.log(error)
+      }
     }
   },
 });

@@ -2,8 +2,11 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import transporter from '../services/emailService.js';
+import { OAuth2Client } from 'google-auth-library';
 
 const usernameRegex = /^[ A-Za-z0-9_@./#&+!-]{8,20}$/;
+
+const client = new OAuth2Client();
 
 // user signup
 export const signup = async (req, res) => {
@@ -80,6 +83,48 @@ export const signin = async (req, res) => {
 			username: user.username,
 			email: user.email,
 		});
+
+  } catch (error) {
+    console.error('Signin Error:', error);
+    res.status(500).json({ message: 'Login failed', error });
+  }
+};
+
+// OAuth signin
+export const oAuthSignin = async (req, res) => {
+  const { email, OAuthToken } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // check OAuthToken for validity
+    const ticket = await client.verifyIdToken({
+      idToken: OAuthToken,
+      audience: CLIENT_ID,  // Specify the CLIENT_ID of the app that accesses the backend
+    }).catch((error) => {
+      throw new Error(error);
+    });
+
+    // TODO how to use userid
+    const payload = ticket.getPayload();
+    const userid = payload['sub'];
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none"
+    });
+
+    res.json({
+      message: "Login successful",
+      username: user.username,
+      email: user.email,
+    });
 
   } catch (error) {
     console.error('Signin Error:', error);
