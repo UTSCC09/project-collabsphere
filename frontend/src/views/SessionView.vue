@@ -11,9 +11,14 @@ import ClientAVFrame from '../components/ClientAVFrame.vue'
 import { onDisconnect, removeClientStream, setupMedia, clientConfigData } from "@/services/streamService";
 import fetchWrapper from "@/utils/fetchWrapper.js";
 import { useNotificationStore } from "@/stores/notification";
+import router from "@/router";
 
 const isHost = ref(false);
 const hostId = ref(null);
+
+const userstore = useUserdataStore()
+
+const isLoggedIn = computed(() => userstore.isLoggedIn)
 
 const sessionID = computed(() => {
   return useUserdataStore().sessionID;
@@ -83,6 +88,10 @@ async function getHostId() {
 }
 
 onBeforeMount(async () => {
+  if (!isLoggedIn.value) {
+    await router.push({name: 'home'});
+  }
+
   // opens socket connection to backend
   socket = io(`${import.meta.env.VITE_PUBLIC_SOCKET}`, {
     transports: ['websocket', 'polling', 'flashsocket'],

@@ -2,7 +2,7 @@
 import { useNotificationStore } from '@/stores/notification';
 import { useUserdataStore } from '@/stores/userdata';
 import { computed, watch } from 'vue';
-import { useRoute,useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 const router = useRouter()
 
