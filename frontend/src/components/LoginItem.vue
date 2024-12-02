@@ -7,6 +7,7 @@ const userstore = useUserdataStore()
 
 // password regex
 const reg = new RegExp('^[ A-Za-z0-9_@./#&+!-]{8,}$')
+const usernameRegex = /^[ A-Za-z0-9_@./#&+!-]{8,20}$/;
 
 const status = ref('Sign in')
 const match_error = ref('')
@@ -43,8 +44,6 @@ function check_password() {
 }
 
 function validate_username() {
-  const usernameRegex = /^[ A-Za-z0-9_@./#&+!-]{8,20}$/;
-
   if (usernameRegex.test(username.value)) {
     username_error.value = ''
   } else {
@@ -90,7 +89,6 @@ async function signin() {
   }
 
   processing.value = false
-
 }
 
 async function signup() {
@@ -135,20 +133,26 @@ async function signup() {
 }
 
 const isDisabled = computed(() => {
-  return !(reg.test(password.value) && password.value === cpassword.value)
+  return !(reg.test(username.value) && reg.test(password.value) && password.value === cpassword.value);
+});
+
+const isAuthDisabled = computed(() => {
+  return !reg.test(username.value);
 });
 
 const client = google.accounts.oauth2.initTokenClient({
   client_id: 'YOUR_GOOGLE_CLIENT_ID',
   scope: 'https://www.googleapis.com/auth/userinfo.email',
   callback: (response) => {
-    // retrieve email from response
-    // switch status to 'OAuth username'
-    // send fetch request to see if email already exists in database
-    // if it does sign in? or maybe check if account is an OAuth account
-    // else set status to 'OAuth username' with one username field
+    if (google.accounts.oauth2.hasGrantedAnyScope(response, 'https://www.googleapis.com/auth/userinfo.email')) {
+      const email = response.userinfo.email;
+      status.value = 'Choose your display name';
+      // send fetch request to see if email already exists in database
+      // if it does, send sign in request with token to verify
+      // else set status to 'OAuth username' with one username field
       // on submit, fetch and check if username is already in use
-      // if not, add user to database and sign in
+      // if not, add user to database with token to verify and sign in
+    }
   },
 });
 </script>
@@ -312,7 +316,29 @@ const client = google.accounts.oauth2.initTokenClient({
       <p>TODO: Implement at the end</p>
     </div>
     -->
+    <div
+      v-else-if="status === 'Choose your display name'"
+      class="mt-10 sm:mx-auto sm:w-full sm:max-w-sm"
+    >
+      <div class="mt-2 mb-2">
+        <input
+          name="username"
+          @keyup="validate_username"
+          v-model="username"
+          autocomplete="username"
+          placeholder="display name"
+          required
+          class="form-input"
+        />
+      </div>
+      <p id="regex-error" class="text-red-400">{{ username_error }}</p>
+      <input
+        type="submit"
+        class="btn"
+        :disabled="isAuthDisabled"
+        value="Complete registration"
+      />
+    </div>
   </div>
 </template>
-
 <style lang="postcss" scoped></style>
