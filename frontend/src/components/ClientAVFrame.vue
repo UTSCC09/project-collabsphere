@@ -1,12 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, type Ref } from 'vue'
 import type { Socket } from 'socket.io-client'
-import ClientAVMenu from './ClientAVMenu.vue'
-import { useUserdataStore } from '@/stores/userdata';
 
 /*
-
-
   const mediaStreamSource = audioContext.createMediaStreamSource(stream);
   const analyser = audioContext.createAnalyser();
   mediaStreamSource.connect(analyser);
@@ -35,16 +31,15 @@ import { useUserdataStore } from '@/stores/userdata';
   }
 
   monitorParticipant();
-
-  */
+*/
 
 export interface ClientStreamData {
   id: string
   producerId: string
   audioProducerId?: string
   username: string
-  audioDisabled: boolean
-  videoDisabled: boolean
+  audioDisabled?: boolean
+  videoDisabled?: boolean
   stream: MediaStream
   socket: Socket
   isLocal?: boolean
@@ -66,23 +61,30 @@ const isMyself = computed(() => {
 })
 
 const createBlackFrame = () => {
-  const canvas = document.createElement('canvas');
-  canvas.width = 640; // Set the width of the black frame
-  canvas.height = 480; // Set the height of the black frame
-  const context = canvas.getContext('2d');
-  context.fillStyle = 'black';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  return canvas.captureStream().getVideoTracks()[0];
+    const canvas = document.createElement('canvas');
+    canvas.width = 640; // Set the width of the black frame
+    canvas.height = 480; // Set the height of the black frame
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.fillStyle = 'black';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    return canvas.captureStream().getVideoTracks()[0];
 };
 
-let audioContext;
-let analyser;
+let audioContext: AudioContext;
+let analyser: AnalyserNode;
 
 try {
     audioContext = new AudioContext();
     analyser = audioContext.createAnalyser();
 } catch (e) {
     console.log(e)
+}
+
+const pause_resume_cb = (data : {error: string}) => {
+    if (data && data.error) {
+        console.error(data.error)
+    }
 }
 
 function toggleMute() {
@@ -95,7 +97,7 @@ function toggleMute() {
             clientId: props.data.id,
             producerId: props.data.audioProducerId, 
             kind: 'audio'
-        }, (data)=>{})
+        }, pause_resume_cb)
 
     } else {
 
@@ -103,7 +105,7 @@ function toggleMute() {
             clientId: props.data.id,
             producerId: props.data.audioProducerId,
             kind: 'audio'
-        }, (data)=>{})
+        }, pause_resume_cb)
     }
 }
 
@@ -121,7 +123,7 @@ function toggleVideo() {
             clientId: props.data.id,
             producerId: props.data.producerId, 
             kind: 'video'
-        }, (data)=>{})
+        }, pause_resume_cb)
     } else {
         props.data.stream.getVideoTracks().forEach((track) => {
             track.enabled = true;
@@ -130,7 +132,7 @@ function toggleVideo() {
             clientId: props.data.id,
             producerId: props.data.producerId,
             kind: 'video'
-         }, (data)=>{})
+         }, pause_resume_cb)
     }
 }
 
@@ -139,7 +141,9 @@ const video = ref<HTMLVideoElement | null>(null);
 let mediaStreamSource;
 const FFT_SIZE = 256;
 
-if (analyser) {
+watch( () => analyser, (newVal) => {
+    if (!analyser) return;
+
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
     function checkAudioActivity() {
@@ -149,11 +153,12 @@ if (analyser) {
 
         // Calculate the root mean square (RMS) volume
         let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-            const value = (dataArray[i] - 128) / 128;
+        for (const element of dataArray) {
+            const value = (element - 128) / 128;
             sum += value * value;
         }
 
+        
         const volume = Math.sqrt(sum / dataArray.length);
 
         const threshold = 0.01;
@@ -163,7 +168,7 @@ if (analyser) {
     }
 
     checkAudioActivity();
-}
+});
 
 watch(() => props.data.videoDisabled, (newVal) => {
     props.data.stream.getVideoTracks().forEach((track) => {
@@ -173,7 +178,9 @@ watch(() => props.data.videoDisabled, (newVal) => {
     if (!video.value) return;
     if (props.data.videoDisabled) {
         const blackFrame = createBlackFrame();
-        video.value.srcObject = new MediaStream([blackFrame]);
+        if (!blackFrame) return;
+        video.value.srcObject = new MediaStream();
+        video.value.srcObject.addTrack(blackFrame);
     } else {
         video.value.srcObject = props.data.stream;
     }
@@ -188,7 +195,7 @@ watch(() => props.data.audioDisabled, (newVal) => {
         mediaStreamSource = audioContext.createMediaStreamSource(props.data.stream);
         mediaStreamSource.connect(analyser);
     } else {
-        if (audioContext) audioContext.close();
+        audioContext && audioContext.close();
     }
     props.data.stream.getAudioTracks().forEach((track) => {
         track.enabled = !props.data.audioDisabled;
@@ -198,7 +205,6 @@ watch(() => props.data.audioDisabled, (newVal) => {
 watch(() => props.data.stream, (newStream) => {
     if (video.value) {
         video.value.srcObject = newStream;
-
 
         props.data.stream.getAudioTracks().forEach((track) => {
             track.enabled = false;
