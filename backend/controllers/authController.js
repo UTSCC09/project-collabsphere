@@ -68,7 +68,7 @@ export const oAuthSignup = async (req, res) => {
     // check OAuthToken for validity
     const ticket = await client.verifyIdToken({
       idToken: OAuthToken,
-      audience: CLIENT_ID,  // Specify the CLIENT_ID of the app that accesses the backend
+      audience: process.env.GOOGLE_CLIENT_ID,
     }).catch((error) => {
       throw new Error(error);
     });
@@ -163,7 +163,7 @@ export const oAuthSignin = async (req, res) => {
     // check OAuthToken for validity
     const ticket = await client.verifyIdToken({
       idToken: OAuthToken,
-      audience: CLIENT_ID,  // Specify the CLIENT_ID of the app that accesses the backend
+      audience: process.env.GOOGLE_CLIENT_ID,
     }).catch((error) => {
       throw new Error(error);
     });
