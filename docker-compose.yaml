@@ -11,6 +11,7 @@ services:
     volumes:
       - ./backend:/usr/src/app
       - ./ssl:/usr/src/app/ssl  # Mount the ssl folder
+      - /etc/letsencrypt/live/collabsphere.xyz:/etc/letsencrypt/live/collabsphere.xyz
 
   frontend:
     build:
@@ -22,4 +23,5 @@ services:
       - ./frontend/.env
     volumes:
       - ./frontend:/usr/src/app
+      - /etc/letsencrypt/live/collabsphere.xyz:/etc/letsencrypt/live/collabsphere.xyz
 

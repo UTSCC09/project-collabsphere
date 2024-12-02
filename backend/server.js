@@ -51,13 +51,13 @@ const httpsSocketServer = createServer(config, app);
 
 // * Redirect server
 // modified from https://stackoverflow.com/questions/75253828/redirect-http-to-https-using-express
-httpApp.use((req, res) => {
-  res.redirect("https://collabsphere.xyz/" + req.path);
-});
+// httpApp.use((req, res) => {
+//   res.redirect("https://collabsphere.xyz/" + req.path);
+// });
 
-httpApp.listen(80, () => {
-  console.log("Redirect server listening on port 80.");
-});
+// httpApp.listen(80, () => {
+//   console.log("Redirect server listening on port 80.");
+// });
 
 const io = new Server(httpsSocketServer, {
 	cors: {
