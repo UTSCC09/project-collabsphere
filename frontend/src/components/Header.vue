@@ -70,7 +70,7 @@ onMounted(async () => {
 
 <template>
     <header>
-        <router-link to="/" class=" hover:animate-pulse"><h1 class="text-2xl">CollabSphere</h1></router-link>
+        <router-link to="/" class=" hover:animate-pulse w-fit block"><h1 class="text-2xl w-fit">CollabSphere</h1></router-link>
         <div class="flex h-5 m-2 mb-0" v-if="sessionID && isSessionRoute">
           <p class="font-sans"><b>Session ID: </b>{{sessionID}}</p>
           <!-- copy.svg is licensed with https://opensource.org/license/mit -->
