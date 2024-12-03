@@ -18,22 +18,22 @@ const app = express();
 const httpApp = express();
 
 app.use(cors({
-  origin: process.env.FRONTEND,
-  credentials: true,
+	origin: process.env.FRONTEND,
+	credentials: true,
 }));
 
 app.use(express.json());
 
 app.use(cookieParser())
 
-const privateKey = readFileSync(process.env.SSL_PRIVATE_KEY_PATH || '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem');
-const certificate = readFileSync(process.env.SSL_CERTIFICATE_PATH || '/etc/letsencrypt/live/collabsphere.xyz/cert.pem');
+const privateKey = readFileSync(process.env.SSL_PRIVATE_KEY_PATH ?? '/etc/letsencrypt/live/collabsphere.xyz/privkey.pem');
+const certificate = readFileSync(process.env.SSL_CERTIFICATE_PATH ?? '/etc/letsencrypt/live/collabsphere.xyz/cert.pem');
 
 const config = {
-  key: privateKey,
-  cert: certificate
+	key: privateKey,
+	cert: certificate
 };
- 
+
 const customGenerationFunction = () => (Math.random().toString(36) + "0000000000000000000").substring(2, 16);
 
 app.use(function (req, res, next) {

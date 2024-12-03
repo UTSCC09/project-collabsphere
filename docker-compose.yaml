@@ -1,27 +1,25 @@
 version: '3'
 services:
   backend:
+    network_mode: "host"
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "4000:4000"
+      network: host
+      context: /home/public
+      dockerfile: /home/public/project-collabsphere/backend/Dockerfile
+    # ports:
+    #   - "4000:4000/tcp"
+    #   - "3030:3030/tcp"
+    #   - "3030:3030/udp"
+    #   - "40000-49999:40000-49999/udp"
     env_file:
-      - ./backend/.env
-    volumes:
-      - ./backend:/usr/src/app
-      - ./ssl:/usr/src/app/ssl  # Mount the ssl folder
-      - /etc/letsencrypt/live/collabsphere.xyz:/etc/letsencrypt/live/collabsphere.xyz
+      - /home/public/project-collabsphere/backend/.env
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: /home/public
+      dockerfile: /home/public/project-collabsphere/frontend/Dockerfile
     ports:
       - "80:80"
+      - "443:443"
     env_file:
-      - ./frontend/.env
-    volumes:
-      - ./frontend:/usr/src/app
-      - /etc/letsencrypt/live/collabsphere.xyz:/etc/letsencrypt/live/collabsphere.xyz
-
+      - /home/public/project-collabsphere/frontend/.env

@@ -6,7 +6,7 @@ dotenv.config();
 
 
 /* Debugging Console Log */
-const DEBUG = process.env.DEBUG || true;
+const DEBUG = process.env.DEBUG || false;
 const log = (...args) => {
 	if (DEBUG) {
 		console.log(...args);
@@ -14,7 +14,7 @@ const log = (...args) => {
 };
 
 // Load config/mediasoup-config.json
-import config from "./config/mediasoup-config.json" assert { type: "json" };
+import config from "./config/mediasoup-config.json" with { type: "json" };
 
 // https://mediasoup.org/documentation/v3/mediasoup/api/#WorkerSettings
 const workerSettings = {
@@ -91,7 +91,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 	// ? Placed here to reuse parent scope variables
 
 	/* Returns a boolean indicating whether the transport belongs to the client */
-	const transport_belongs_to_self = (transportId, callback = (data) => {}) => {
+	const transport_belongs_to_self = (transportId, callback = (data) => { }) => {
 		try {
 			const room = get_room(sessionId);
 			const client = get_client(room, id);
@@ -113,7 +113,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		return false;
 	};
 
-	const producer_or_consurmer_belongs_to_self = (transportId, callback = (data) => {}) => {
+	const producer_or_consurmer_belongs_to_self = (transportId, callback = (data) => { }) => {
 		try {
 			const room = get_room(sessionId);
 			const client = get_client(room, id);
@@ -140,7 +140,7 @@ const bind_mediasoup = (socket, sessionId, id) => {
 		return false;
 	};
 
-	const is_host_or_transport_owner = (transportId, callback = (data) => {}) => {
+	const is_host_or_transport_owner = (transportId, callback = (data) => { }) => {
 		// TODO : Implement host
 		return transport_belongs_to_self(transportId) || producer_or_consurmer_belongs_to_self(transportId);
 	};
