@@ -40,3 +40,8 @@ npm run start
 ```
 
 ### Deployment with Docker
+
+Run the following command inside the main project folder to run the application using Docker:
+```
+docker compose up
+```
