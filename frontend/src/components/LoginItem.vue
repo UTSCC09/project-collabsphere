@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // @ts-nocheck
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useUserdataStore } from '@/stores/userdata'
 import SpinnerIcon from './SpinnerIcon.vue';
 import fetchWrapper from "@/utils/fetchWrapper";
@@ -188,60 +188,63 @@ const isAuthDisabled = computed(() => {
   return !reg.test(username.value);
 });
 
-const client = google.accounts.oauth2.initTokenClient({
-  client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-  scope: 'https://www.googleapis.com/auth/userinfo.email',
-  callback: async (response) => {
-    if (google.accounts.oauth2.hasGrantedAnyScope(response, 'https://www.googleapis.com/auth/userinfo.email')) {
-      token = response;
+let client = null;
+onMounted(() => {
+  client = google.accounts.oauth2.initTokenClient({
+    client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/userinfo.email',
+    callback: async (response) => {
+      if (google.accounts.oauth2.hasGrantedAnyScope(response, 'https://www.googleapis.com/auth/userinfo.email')) {
+        token = response;
 
-      // try to sign in with the token
-      response_error.value = ''
-      processing.value = true
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_PUBLIC_BACKEND}/api/oauth-signin`,
-          {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
+        // try to sign in with the token
+        response_error.value = ''
+        processing.value = true
+        try {
+          const res = await fetch(
+            `${import.meta.env.VITE_PUBLIC_BACKEND}/api/oauth-signin`,
+            {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                OAuthToken: response,
+              }),
             },
-            body: JSON.stringify({
-              OAuthToken: response,
-            }),
-          },
-        );
+          );
 
-        // if the account does not exist, let user sign up with token
-        if (res.status === 404) {
-          status.value = 'Choose your display name';
-          return;
-        }
-
-        if (!res.ok) {
-          try {
-            const json = await res.json()
-            response_error.value = json.message || 'Error signing up'
-          } finally {
-            throw new Error(`Response status: ${res.status}`)
+          // if the account does not exist, let user sign up with token
+          if (res.status === 404) {
+            status.value = 'Choose your display name';
+            return;
           }
+
+          if (!res.ok) {
+            try {
+              const json = await res.json()
+              response_error.value = json.message || 'Error signing up'
+            } finally {
+              throw new Error(`Response status: ${res.status}`)
+            }
+          }
+
+          const json = await res.json();
+          const { username, email: resEmail } = json;
+
+          userstore.setUsername(username);
+          userstore.setEmail(resEmail);
+          userstore.login();
+          return;
+        } catch (error) {
+          console.log(error)
         }
 
-        const json = await res.json();
-        const { username, email: resEmail } = json;
-
-        userstore.setUsername(username);
-        userstore.setEmail(resEmail);
-        userstore.login();
-        return;
-      } catch (error) {
-        console.log(error)
+        processing.value = false
       }
-
-      processing.value = false
-    }
-  },
+    },
+  });
 });
 </script>
 
